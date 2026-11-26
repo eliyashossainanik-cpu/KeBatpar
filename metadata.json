@@ -1,0 +1,6 @@
+{
+  "name": "Ke Vondo",
+  "description": "3D Bangla satire social deduction multiplayer game inspired by Among Us. Complete Para tasks and unmask the Vondo!",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

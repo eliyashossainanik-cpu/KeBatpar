@@ -1,0 +1,29 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ke-vondo1",
+  "main": "worker.ts",
+  "compatibility_date": "2026-03-01",
+  "build": {
+    "command": "npm run build"
+  },
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/ws", "/ws/*"]
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "MOHOLLA_ROOM",
+        "class_name": "MohollaRoomDO"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["MohollaRoomDO"]
+    }
+  ]
+}

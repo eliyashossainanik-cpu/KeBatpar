@@ -1,0 +1,232 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-display: 'Noto Sans Bengali', 'Bricolage Grotesque', sans-serif;
+    --font-sans: 'Noto Sans Bengali', 'Plus Jakarta Sans', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  html,
+  body,
+  #root {
+    width: 100%;
+    height: 100%;
+    height: 100dvh;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    overscroll-behavior: none;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    background-color: #0b1220;
+    color: #f8fafc;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    user-select: none;
+  }
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-mono-tabular {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-stroke {
+  paint-order: stroke fill;
+  -webkit-text-stroke: 3px rgba(10, 14, 22, 0.9);
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.75);
+}
+
+@keyframes amg-spotlight-sweep {
+  0% {
+    opacity: 0;
+    transform: translateY(-10%) scaleY(0.7) rotate(-14deg);
+  }
+  45% {
+    opacity: 0.95;
+  }
+  100% {
+    opacity: 0.72;
+    transform: translateY(0%) scaleY(1) rotate(-8deg);
+  }
+}
+
+@keyframes amg-shh-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.55) translateY(14px);
+    letter-spacing: 0.45em;
+  }
+  65% {
+    opacity: 1;
+    transform: scale(1.08) translateY(0);
+    letter-spacing: 0.22em;
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    letter-spacing: 0.24em;
+  }
+}
+
+@keyframes amg-card-slam {
+  0% {
+    opacity: 0;
+    transform: scale(1.18) translateY(16px);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(0.98) translateY(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes amg-float-runner {
+  0%,
+  100% {
+    transform: translateY(0px) rotate(-3deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(3deg);
+  }
+}
+
+@keyframes amg-loading-bar {
+  0% {
+    transform: translateX(-60%);
+  }
+  100% {
+    transform: translateX(180%);
+  }
+}
+
+@keyframes amg-fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-amg-spotlight {
+  animation: amg-spotlight-sweep 1.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.animate-amg-shh {
+  animation: amg-shh-pop 0.65s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.animate-amg-slam {
+  animation: amg-card-slam 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.animate-amg-runner {
+  animation: amg-float-runner 1.6s ease-in-out infinite;
+}
+
+.animate-amg-loading-bar {
+  animation: amg-loading-bar 1.2s ease-in-out infinite;
+}
+
+.animate-fade-in {
+  animation: amg-fade-in 0.35s ease-out forwards;
+}
+
+@keyframes kb-beam-sweep {
+  0%,
+  100% {
+    opacity: 0.38;
+    transform: translate3d(-4%, -2%, 0) rotate(-14deg) scale(1);
+  }
+  50% {
+    opacity: 0.65;
+    transform: translate3d(4%, 2%, 0) rotate(-10deg) scale(1.06);
+  }
+}
+
+@keyframes kb-ember-drift {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0) scale(0.7);
+  }
+  20% {
+    opacity: 0.85;
+  }
+  80% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(14px, -78px, 0) scale(1.1);
+  }
+}
+
+@keyframes kb-emblem-hover {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(-1.5deg);
+  }
+  50% {
+    transform: translate3d(0, -5px, 0) rotate(1.5deg);
+  }
+}
+
+@keyframes kb-cta-sheen {
+  0% {
+    transform: translate3d(-140%, 0, 0) skewX(-22deg);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.45;
+  }
+  38% {
+    transform: translate3d(260%, 0, 0) skewX(-22deg);
+    opacity: 0;
+  }
+  100% {
+    transform: translate3d(260%, 0, 0) skewX(-22deg);
+    opacity: 0;
+  }
+}
+
+.kb-beam-sweep {
+  animation: kb-beam-sweep 11s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+.kb-ember-drift {
+  animation: kb-ember-drift var(--ember-dur, 7s) ease-in-out var(--ember-delay, 0s) infinite;
+  will-change: transform, opacity;
+}
+
+.kb-emblem-hover {
+  animation: kb-emblem-hover 4.2s ease-in-out infinite;
+  will-change: transform;
+}
+
+.kb-cta-sheen {
+  animation: kb-cta-sheen 4.6s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kb-beam-sweep,
+  .kb-ember-drift,
+  .kb-emblem-hover,
+  .kb-cta-sheen,
+  .animate-amg-runner,
+  .animate-amg-loading-bar {
+    animation: none !important;
+  }
+}

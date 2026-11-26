@@ -1,0 +1,10 @@
+{
+  "name": "Ke Batpar? (কে বাটপার?) — Moholla Comedy",
+  "short_name": "Ke Batpar?",
+  "description": "Funny 3D Bangla satire social deduction multiplayer game. Brew Dudh-Cha, trigger viral memes, and toss the Batpar into the Pukur!",
+  "start_url": "/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0b1220",
+  "theme_color": "#0b1220"
+}
