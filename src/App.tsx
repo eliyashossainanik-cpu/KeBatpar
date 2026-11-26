@@ -76,11 +76,25 @@ export default function App() {
   const [killFlash, setKillFlash] = useState(false);
   const [showOutcomeModal, setShowOutcomeModal] = useState(false);
   const [loadingSubtitle, setLoadingSubtitle] = useState<string | null>(null);
-  const [compassYaw, setCompassYaw] = useState(0);
+  const compassYawRef = useRef(0);
+  const compassListenersRef = useRef(new Set<(yaw: number) => void>());
   const [driveSpeedMs, setDriveSpeedMs] = useState(0);
   const touchOverrideRef = useRef(false);
   const recordedOutcomeRef = useRef(false);
   const loadingTimerRef = useRef<number | null>(null);
+
+  const handleCompassYawChange = useCallback((yaw: number) => {
+    compassYawRef.current = yaw;
+    for (const cb of compassListenersRef.current) cb(yaw);
+  }, []);
+
+  const subscribeCompassYaw = useCallback((cb: (yaw: number) => void) => {
+    compassListenersRef.current.add(cb);
+    cb(compassYawRef.current);
+    return () => {
+      compassListenersRef.current.delete(cb);
+    };
+  }, []);
   const [touchControlsEnabled, setTouchControlsEnabled] = useState<boolean>(() =>
     isTouchOrMobileDevice(),
   );
@@ -942,7 +956,7 @@ export default function App() {
         onPointerLookChange={setPointerLookEnabled}
         resetCameraRef={resetCameraRef}
         jumpTriggerRef={jumpTriggerRef}
-        onCompassYawChange={setCompassYaw}
+        onCompassYawChange={handleCompassYawChange}
       />
 
       {/* Title Screen */}
@@ -1104,7 +1118,7 @@ export default function App() {
             pointerLookEnabled={pointerLookEnabled}
             clueNotice={clueNotice}
             killFlash={killFlash}
-            compassYaw={compassYaw}
+            subscribeCompassYaw={subscribeCompassYaw}
             onToggleTouchControls={handleToggleTouchControls}
             onTogglePointerLook={handleTogglePointerLook}
             onResetCamera={handleResetCamera}

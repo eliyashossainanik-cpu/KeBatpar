@@ -255,23 +255,23 @@ export function WorldScene({
     let currentDpr = isSoftwareGl
       ? 1
       : isMobileGpu
-        ? Math.min(window.devicePixelRatio || 1, 1.25)
+        ? Math.min(window.devicePixelRatio || 1, 1.75)
         : Math.min(window.devicePixelRatio || 1, 1.5);
 
     const width = container.clientWidth || window.innerWidth;
     const height = container.clientHeight || window.innerHeight;
 
     const renderer = new THREE.WebGLRenderer({
-      antialias: !isSoftwareGl,
+      antialias: !isLiteGraphics,
       powerPreference: 'high-performance',
     });
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = isMobileGpu ? 1.04 : 1.02;
+    renderer.toneMappingExposure = isMobileGpu ? 1.06 : 1.02;
     renderer.setPixelRatio(currentDpr);
     renderer.setSize(width, height);
     renderer.shadowMap.enabled = !isSoftwareGl;
-    renderer.shadowMap.autoUpdate = !isMobileGpu;
+    renderer.shadowMap.autoUpdate = true;
     renderer.shadowMap.type = isMobileGpu ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
 
     const canvas = renderer.domElement;
@@ -301,20 +301,25 @@ export function WorldScene({
     scene.environmentIntensity = baseEnvIntensity;
     pmremGenerator.dispose();
 
-    const camera = new THREE.PerspectiveCamera(54, width / height, 0.2, isMobileGpu ? 540 : 640);
+    const camera = new THREE.PerspectiveCamera(
+      isMobileGpu ? 49 : 54,
+      width / height,
+      0.2,
+      isMobileGpu ? 520 : 640,
+    );
     camera.position.set(0, 18, 34);
 
     // Golden-Hour / Late-Afternoon Sunlit Outdoor PBR Lighting Rig + Player-Tracking Shadow Frustum
-    const baseHemiIntensity = isMobileGpu ? 0.82 : 0.76;
+    const baseHemiIntensity = isMobileGpu ? 0.88 : 0.76;
     const baseKeyIntensity = 2.45;
-    const baseBounceIntensity = 0.36;
+    const baseBounceIntensity = isMobileGpu ? 0.42 : 0.36;
     const hemiLight = new THREE.HemisphereLight(0xd4e8ff, 0x6b5848, baseHemiIntensity);
     scene.add(hemiLight);
 
     const keyLight = new THREE.DirectionalLight(0xfff1d6, baseKeyIntensity);
     keyLight.position.set(32, 46, 26);
     keyLight.castShadow = !isSoftwareGl;
-    const shadowRes = isSoftwareGl ? 1024 : isMobileGpu ? 768 : 2048;
+    const shadowRes = isSoftwareGl ? 1024 : isMobileGpu ? 1024 : 2048;
     const titleShadowSpan = 48;
     const playShadowSpan = isMobileGpu ? 14 : 26;
     keyLight.shadow.mapSize.set(shadowRes, shadowRes);
@@ -324,9 +329,9 @@ export function WorldScene({
     keyLight.shadow.camera.right = titleShadowSpan;
     keyLight.shadow.camera.top = titleShadowSpan;
     keyLight.shadow.camera.bottom = -titleShadowSpan;
-    keyLight.shadow.radius = 2.2;
-    keyLight.shadow.bias = -0.0003;
-    keyLight.shadow.normalBias = 0.018;
+    keyLight.shadow.radius = isMobileGpu ? 1.8 : 2.2;
+    keyLight.shadow.bias = -0.00035;
+    keyLight.shadow.normalBias = 0.02;
     scene.add(keyLight);
     scene.add(keyLight.target);
 
@@ -334,23 +339,27 @@ export function WorldScene({
     bounceLight.position.set(-28, 14, -26);
     scene.add(bounceLight);
 
-    const rimLight = new THREE.DirectionalLight(0xffdfb8, 0.28);
-    rimLight.position.set(-34, 24, 34);
-    scene.add(rimLight);
+    if (!isMobileGpu) {
+      const rimLight = new THREE.DirectionalLight(0xffdfb8, 0.28);
+      rimLight.position.set(-34, 24, 34);
+      scene.add(rimLight);
+    }
 
     // Emergency personal lantern (activates during Loadshedding)
     const lanternLight = new THREE.PointLight(0xfbbf24, 0, 15, 1.8);
     lanternLight.position.set(0, 2.9, 0);
+    lanternLight.visible = false;
     scene.add(lanternLight);
 
     // Dynamic vehicle headlight SpotLight (illuminates road during Loadshedding when driving)
     const vehHeadlightSpot = new THREE.SpotLight(0xfff4d6, 0, 26, Math.PI * 0.24, 0.55, 1.4);
     vehHeadlightSpot.castShadow = false;
+    vehHeadlightSpot.visible = false;
     scene.add(vehHeadlightSpot, vehHeadlightSpot.target);
 
     const textures = createProceduralTextures(
       renderer,
-      isMobileGpu ? 2 : 8,
+      isMobileGpu ? 4 : 8,
       isSoftwareGl ? 'low' : isMobileGpu ? 'medium' : 'high',
     );
 
@@ -381,6 +390,7 @@ export function WorldScene({
     compoundFloor.rotation.x = -Math.PI / 2;
     compoundFloor.position.y = 0;
     compoundFloor.receiveShadow = true;
+    compoundFloor.renderOrder = 3;
     scene.add(compoundFloor);
 
     // Moholla Main Avenues + Inner Ring + Outer Para & Rail Boulevards (320m × 320m Map)
@@ -476,7 +486,11 @@ export function WorldScene({
       aveNS.receiveShadow = true;
       roadsGroup.add(aveNS);
     }
-    scene.add(optimizeStaticGroupSpatial(roadsGroup, 80));
+    const roadsBatched = optimizeStaticGroupSpatial(roadsGroup, 80);
+    roadsBatched.traverse((o) => {
+      if ((o as THREE.Mesh).isMesh) o.renderOrder = 2;
+    });
+    scene.add(roadsBatched);
 
     const dashMat = new THREE.MeshStandardMaterial({
       color: '#cbd5e1',
@@ -766,7 +780,11 @@ export function WorldScene({
         { x: blk.x + blk.w / 2, y: 0.055, z: blk.z, sx: 0.24, sz: blk.d + 0.3 },
       );
     }
-    scene.add(optimizeStaticGroupSpatial(groundPadsGroup, 80));
+    const groundPadsBatched = optimizeStaticGroupSpatial(groundPadsGroup, 80);
+    groundPadsBatched.traverse((o) => {
+      if ((o as THREE.Mesh).isMesh) o.renderOrder = 1;
+    });
+    scene.add(groundPadsBatched);
 
     const borderCurbGeo = new THREE.BoxGeometry(1, 0.12, 1);
     const borderCurbInst = new THREE.InstancedMesh(borderCurbGeo, curbMat, borderCurbPlacements.length);
@@ -2429,7 +2447,7 @@ export function WorldScene({
     bazarTube.position.set(42.5, 2.86, 0);
     buildingStaticGroup.add(bazarTube);
     scene.add(optimizeStaticGroupSpatial(buildingStaticGroup, 80));
-    scene.add(createBazarProps(textures, isLiteGraphics));
+    scene.add(createBazarProps(textures, isSoftwareGl));
 
     // Banglish Posters & Dustbins along the Tactical Alley Sightline Walls
     scene.add(createAlleyProps(textures, isLiteGraphics));
@@ -2456,7 +2474,7 @@ export function WorldScene({
       [108.5, 103.5, -0.18],
     ];
     instantiateGroupAtTransforms(
-      createSupplyCluster(textures, isLiteGraphics),
+      createSupplyCluster(textures, isSoftwareGl),
       supplySpots.map(([x, z, rotY]) => ({ x, z, rotY })),
       scene,
     );
@@ -2478,7 +2496,7 @@ export function WorldScene({
       [15.0, 124.5, -0.08],
     ];
     instantiateGroupAtTransforms(
-      createSandbagBarricade(isLiteGraphics),
+      createSandbagBarricade(isSoftwareGl),
       barricadeSpots.map(([x, z, rotY]) => ({ x, z, rotY })),
       scene,
     );
@@ -2531,13 +2549,13 @@ export function WorldScene({
       ['#7c3aed', 105.5, 120.1, 0],
       ['#be123c', 134.0, 126.0, 0],
     ] as const) {
-      const tapri = createRoadsideTapriStall(roofHex, textures, isLiteGraphics, isLiteGraphics);
+      const tapri = createRoadsideTapriStall(roofHex, textures, isSoftwareGl, isLiteGraphics);
       tapri.position.set(x, 0, z);
       tapri.rotation.y = rotY;
       scene.add(tapri);
     }
 
-    const swDepot = createBrickDepotCluster(isLiteGraphics);
+    const swDepot = createBrickDepotCluster(isSoftwareGl);
     swDepot.position.set(-104.15, 0, 104.4);
     scene.add(swDepot);
 
@@ -2664,7 +2682,7 @@ export function WorldScene({
 
     // 4 'Jatri Chhauni' Bus Stop Shelters on Avenue Sidewalks
     instantiateGroupAtTransforms(
-      createBusStopShelterModel(isLiteGraphics, isLiteGraphics),
+      createBusStopShelterModel(isSoftwareGl, isLiteGraphics),
       [
         { x: -10.0, z: -58.5, rotY: 0 },
         { x: 10.0, z: 58.5, rotY: Math.PI },
@@ -2725,7 +2743,7 @@ export function WorldScene({
     );
 
     instantiateGroupAtTransforms(
-      createJhalmuriCartModel(isLiteGraphics, isLiteGraphics),
+      createJhalmuriCartModel(isSoftwareGl, isLiteGraphics),
       [
         { x: -15.5, z: -18.5, rotY: 0.4 },
         { x: 15.5, z: 18.5, rotY: -2.6 },
@@ -2847,25 +2865,25 @@ export function WorldScene({
     scene.add(garlands.group);
 
     // Composite Hero Landmarks, Detailed Shop Interiors & Vehicles
-    scene.add(createAddaMonument(isLiteGraphics));
-    const chaStall = createChaStallProps(textures, isLiteGraphics);
+    scene.add(createAddaMonument(isSoftwareGl));
+    const chaStall = createChaStallProps(textures, isSoftwareGl);
     scene.add(chaStall.group);
-    scene.add(createRickshawGarageProps(textures, isLiteGraphics));
+    scene.add(createRickshawGarageProps(textures, isSoftwareGl));
     scene.add(createEidgahGate(isSoftwareGl));
     scene.add(createWaterTowerModel(isSoftwareGl));
 
     // 5 Hi-Poly Outer Moholla Landmarks + South Dhaka Rail Crossing + 15 New 320m Outer Locations
-    scene.add(createFuchkaCartModel(textures, isLiteGraphics, isLiteGraphics));
-    const saloonProps = createSaloonProps(textures, isLiteGraphics);
+    scene.add(createFuchkaCartModel(textures, isSoftwareGl, isLiteGraphics));
+    const saloonProps = createSaloonProps(textures, isSoftwareGl);
     scene.add(saloonProps.group);
-    scene.add(createCricketMathProps(textures, isLiteGraphics));
-    scene.add(createPharmacyProps(textures, isLiteGraphics));
-    const biyerPandal = createBiyerPandalProps(textures, isLiteGraphics);
+    scene.add(createCricketMathProps(textures, isSoftwareGl));
+    scene.add(createPharmacyProps(textures, isSoftwareGl));
+    const biyerPandal = createBiyerPandalProps(textures, isSoftwareGl);
     scene.add(biyerPandal.group);
-    const shishuPark = createShishuParkProps(textures, isLiteGraphics);
+    const shishuPark = createShishuParkProps(textures, isSoftwareGl);
     scene.add(shishuPark.group);
-    scene.add(createOuterShopProps(textures, isLiteGraphics));
-    const railGate = createRailCrossingGate(textures, isLiteGraphics);
+    scene.add(createOuterShopProps(textures, isSoftwareGl));
+    const railGate = createRailCrossingGate(textures, isSoftwareGl);
     scene.add(railGate.group);
     const banglaTrain = createBanglaTrainModel(isSoftwareGl, isLiteGraphics);
     banglaTrain.group.position.set(-195, 0.16, RAILWAY_TRACK_Z);
@@ -2906,18 +2924,18 @@ export function WorldScene({
       });
     }
 
-    const desco = createDescoTransformer(textures, isLiteGraphics);
+    const desco = createDescoTransformer(textures, isSoftwareGl);
     desco.group.position.set(-38.25, 0, 32.65);
     scene.add(desco.group);
 
-    const dishHub = createDishHub(textures, isLiteGraphics);
+    const dishHub = createDishHub(textures, isSoftwareGl);
     scene.add(dishHub.group);
 
-    const adminTable = createAdminTableModel(isLiteGraphics);
+    const adminTable = createAdminTableModel(isSoftwareGl);
     adminTable.position.set(ADMIN_TABLE_POS.x, 0, ADMIN_TABLE_POS.z);
     scene.add(adminTable);
 
-    const vitalsKiosk = createVitalsKioskModel(isLiteGraphics);
+    const vitalsKiosk = createVitalsKioskModel(isSoftwareGl);
     vitalsKiosk.position.set(VITALS_POS.x, 0, VITALS_POS.z);
     scene.add(vitalsKiosk);
 
@@ -3351,8 +3369,10 @@ export function WorldScene({
 
     // PUBG-Style Spherical Free Orbit Camera + Multi-Touch Pinch + Optional Mouse-Look
     const DEFAULT_CAM_YAW = 0;
-    const DEFAULT_CAM_PITCH = 0.54;
-    const DEFAULT_CAM_DIST = 10.8;
+    const DEFAULT_CAM_PITCH = isMobileGpu ? 0.44 : 0.54;
+    const DEFAULT_CAM_DIST = isMobileGpu ? 7.6 : 10.8;
+    const MIN_CAM_DIST = isMobileGpu ? 4.4 : 5.0;
+    const MAX_CAM_DIST = isMobileGpu ? 13.5 : 15.5;
 
     const keysPressed = new Set<string>();
     let targetCamYaw = DEFAULT_CAM_YAW;
@@ -3496,7 +3516,7 @@ export function WorldScene({
         const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
         if (prevPinchDist !== null) {
           const delta = prevPinchDist - dist;
-          targetCamDist = Math.max(5.0, Math.min(15.5, targetCamDist + delta * 0.032));
+          targetCamDist = Math.max(MIN_CAM_DIST, Math.min(MAX_CAM_DIST, targetCamDist + delta * 0.032));
         }
         prevPinchDist = dist;
         return;
@@ -3518,7 +3538,7 @@ export function WorldScene({
     const onWheel = (e: WheelEvent) => {
       if (!canOrbitNow()) return;
       e.preventDefault();
-      targetCamDist = Math.max(5.2, Math.min(15.2, targetCamDist + e.deltaY * 0.0065));
+      targetCamDist = Math.max(MIN_CAM_DIST, Math.min(MAX_CAM_DIST, targetCamDist + e.deltaY * 0.0065));
     };
 
     const onPointerLockChange = () => {
@@ -3925,15 +3945,15 @@ export function WorldScene({
                 renderer.setSize(rw, rh);
               }
             }
-          } else if (avgDt > 0.0195) {
-            if (currentDpr > 1.15) {
-              currentDpr = 1.12;
+          } else if (avgDt > 0.022) {
+            if (currentDpr > 1.52) {
+              currentDpr = 1.48;
               renderer.setPixelRatio(currentDpr);
               const rw = container.clientWidth || window.innerWidth;
               const rh = container.clientHeight || window.innerHeight;
               renderer.setSize(rw, rh);
-            } else if (currentDpr > 1.02) {
-              currentDpr = 1.0;
+            } else if (currentDpr > 1.38) {
+              currentDpr = 1.35;
               renderer.setPixelRatio(currentDpr);
               const rw = container.clientWidth || window.innerWidth;
               const rh = container.clientHeight || window.innerHeight;
@@ -4097,7 +4117,9 @@ export function WorldScene({
         keyLight.intensity = baseKeyIntensity;
         bounceLight.intensity = baseBounceIntensity;
         lanternLight.intensity = 0;
+        lanternLight.visible = false;
         vehHeadlightSpot.intensity = 0;
+        vehHeadlightSpot.visible = false;
         scene.environmentIntensity = baseEnvIntensity;
         skyline.skyUniforms.uDarkness.value = 0;
         skyline.starMat.opacity = 0;
@@ -4128,10 +4150,7 @@ export function WorldScene({
           lastShadowSx = 0;
           lastShadowSz = 0;
           lastShadowFloorY = 0;
-          if (isMobileGpu) renderer.shadowMap.needsUpdate = true;
           lastShadowPhase = 'title';
-        } else if (isMobileGpu && frameCounter % 2 === 0) {
-          renderer.shadowMap.needsUpdate = true;
         }
       } else if (snap) {
         if ((isModalOpenRef.current || !canOrbitNow()) && document.pointerLockElement === canvas) {
@@ -4191,8 +4210,8 @@ export function WorldScene({
         camPitch += (targetCamPitch - camPitch) * rotSmooth;
         camDist += (targetCamDist - camDist) * rotSmooth;
 
-        const compassMinMs = isMobileGpu ? 120 : 80;
-        const compassMinDelta = isMobileGpu ? 0.045 : 0.02;
+        const compassMinMs = isMobileGpu ? 70 : 60;
+        const compassMinDelta = 0.015;
         if (
           onCompassYawChangeRef.current &&
           now - lastCompassSendAt >= compassMinMs &&
@@ -4588,8 +4607,10 @@ export function WorldScene({
           );
           vehHeadlightSpot.target.updateMatrixWorld();
           vehHeadlightSpot.intensity = 2.2;
+          vehHeadlightSpot.visible = true;
         } else {
           vehHeadlightSpot.intensity = 0;
+          vehHeadlightSpot.visible = false;
         }
 
         // Toggle ONLY the roof of the single building the local player is standing inside on ground floor
@@ -4618,7 +4639,7 @@ export function WorldScene({
           }
         }
 
-        const baseFov = camera.aspect < 1 ? 62 : 54;
+        const baseFov = isMobileGpu ? (camera.aspect < 1 ? 50 : 48) : camera.aspect < 1 ? 62 : 54;
         const speedFovBoost = curLocalVehId
           ? Math.min(8.5, Math.abs(vehSpeed) * 0.32)
           : isSprinting && Math.hypot(localVelX, localVelZ) > 1.2
@@ -4629,7 +4650,7 @@ export function WorldScene({
           camera.fov = THREE.MathUtils.damp(camera.fov, targetFov, 10, dt);
           camera.updateProjectionMatrix();
         }
-        driveCamOffset = THREE.MathUtils.damp(driveCamOffset, curLocalVehId ? 2.8 : 0, 8, dt);
+        driveCamOffset = THREE.MathUtils.damp(driveCamOffset, curLocalVehId ? (isMobileGpu ? 1.85 : 2.8) : 0, 8, dt);
 
         syncActorsFromSnapshot(snap, dt);
 
@@ -4670,6 +4691,7 @@ export function WorldScene({
         bounceLight.intensity = THREE.MathUtils.damp(bounceLight.intensity, targetBounce, 5, dt);
         scene.environmentIntensity = THREE.MathUtils.damp(scene.environmentIntensity, targetEnv, 5, dt);
         lanternLight.intensity = THREE.MathUtils.damp(lanternLight.intensity, targetLantern, 6, dt);
+        lanternLight.visible = lanternLight.intensity > 0.01;
         lanternLight.distance = crewBlinded ? 9.5 : 20;
 
         skyline.skyUniforms.uDarkness.value = THREE.MathUtils.damp(
@@ -4730,9 +4752,6 @@ export function WorldScene({
           lastShadowFloorY = localFloorY;
           lastShadowSpan = playShadowSpan;
           lastShadowPhase = curPhase;
-        }
-        if (isMobileGpu && (shadowOriginChanged || frameCounter % 2 === 0)) {
-          renderer.shadowMap.needsUpdate = true;
         }
 
         if (snap.sabotage.active === 'gas_leak') {
@@ -4812,14 +4831,15 @@ export function WorldScene({
           const horizDist = effectiveCamDist * Math.cos(camPitch);
           const skyLift = camPitch < 0.08 ? (0.08 - camPitch) * 9.5 : 0;
           const playerCamY = localFloorY + localJumpY * 0.42;
-          _desiredLook.set(localPosX, 1.32 + playerCamY + skyLift, localPosZ);
+          const lookHeight = isMobileGpu ? 1.18 : 1.32;
+          _desiredLook.set(localPosX, lookHeight + playerCamY + skyLift, localPosZ);
           _desiredCamPos.set(
             localPosX + Math.sin(camYaw) * horizDist,
-            1.32 + playerCamY + effectiveCamDist * Math.sin(camPitch),
+            lookHeight + playerCamY + effectiveCamDist * Math.sin(camPitch),
             localPosZ + Math.cos(camYaw) * horizDist,
           );
 
-          _rayOrigin.set(localPosX, 1.32 + playerCamY, localPosZ);
+          _rayOrigin.set(localPosX, lookHeight + playerCamY, localPosZ);
           _rayDir.subVectors(_desiredCamPos, _rayOrigin);
           const maxCamDist = _rayDir.length();
           if (maxCamDist > 0.001) {

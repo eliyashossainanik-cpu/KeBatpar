@@ -2724,7 +2724,7 @@ export function createInstancedGrassTufts(compactDensity = false): {
     s = (s * 1664525 + 1013904223) >>> 0;
     return s / 4294967296;
   };
-  const dScale = compactDensity ? 0.45 : 1;
+  const dScale = compactDensity ? 0.25 : 1;
 
   // 1. Eidgah Maidan edge grass borders (avoiding center task area at 0,-37)
   for (let i = 0; i < Math.round(180 * dScale); i++) {
@@ -3043,19 +3043,31 @@ export function createTwilightSkyline(lowDetail = false): {
 // 5 NEW OUTER MOHOLLA HI-POLY COMPOSITE LANDMARKS + RAIL CROSSING GATE
 // =========================================================================
 
-export function createFuchkaCartModel(textures: ProceduralTextureSet, isSoftwareGl: boolean): THREE.Group {
+export function createFuchkaCartModel(
+  textures: ProceduralTextureSet,
+  isSoftwareGl: boolean,
+  isLiteMaterial = isSoftwareGl,
+): THREE.Group {
   const group = new THREE.Group();
   const cartWood = new THREE.MeshStandardMaterial({ color: '#78350f', roughness: 0.72 });
   const redFrame = new THREE.MeshStandardMaterial({ color: '#b91c1c', roughness: 0.36, metalness: 0.45 });
   const brassMat = new THREE.MeshStandardMaterial({ color: '#f59e0b', roughness: 0.2, metalness: 0.85 });
-  const glassMat = new THREE.MeshPhysicalMaterial({
-    color: '#e0f2fe',
-    roughness: 0.08,
-    metalness: 0.1,
-    clearcoat: 1,
-    transparent: true,
-    opacity: 0.52,
-  });
+  const glassMat = isLiteMaterial
+    ? new THREE.MeshStandardMaterial({
+        color: '#e0f2fe',
+        roughness: 0.12,
+        metalness: 0.2,
+        transparent: true,
+        opacity: 0.52,
+      })
+    : new THREE.MeshPhysicalMaterial({
+        color: '#e0f2fe',
+        roughness: 0.08,
+        metalness: 0.1,
+        clearcoat: 1,
+        transparent: true,
+        opacity: 0.52,
+      });
   const tireMat = new THREE.MeshStandardMaterial({ color: '#0f172a', roughness: 0.88 });
   const rimMat = new THREE.MeshStandardMaterial({ color: '#e2e8f0', roughness: 0.25, metalness: 0.82 });
   const purisMat = new THREE.MeshStandardMaterial({ color: '#d97706', roughness: 0.65 });
@@ -3172,16 +3184,23 @@ export function createFuchkaCartModel(textures: ProceduralTextureSet, isSoftware
 export function createSaloonProps(
   textures: ProceduralTextureSet,
   isSoftwareGl: boolean,
+  isLiteMaterial = isSoftwareGl,
 ): { group: THREE.Group; barberPole: THREE.Group } {
   const group = new THREE.Group();
   const counterMat = new THREE.MeshStandardMaterial({ color: '#831843', roughness: 0.38, metalness: 0.25 });
   const marbleMat = new THREE.MeshStandardMaterial({ color: '#f8fafc', roughness: 0.22 });
-  const mirrorMat = new THREE.MeshPhysicalMaterial({
-    color: '#bae6fd',
-    roughness: 0.06,
-    metalness: 0.9,
-    clearcoat: 1,
-  });
+  const mirrorMat = isLiteMaterial
+    ? new THREE.MeshStandardMaterial({
+        color: '#bae6fd',
+        roughness: 0.08,
+        metalness: 0.88,
+      })
+    : new THREE.MeshPhysicalMaterial({
+        color: '#bae6fd',
+        roughness: 0.06,
+        metalness: 0.9,
+        clearcoat: 1,
+      });
   const chromeMat = new THREE.MeshStandardMaterial({ color: '#e2e8f0', roughness: 0.16, metalness: 0.92 });
   const leatherMat = new THREE.MeshStandardMaterial({ color: '#be123c', roughness: 0.48 });
 

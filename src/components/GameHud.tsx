@@ -1,4 +1,4 @@
-import { memo, useEffect, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import {
   PLAYER_COLORS,
   SPECIAL_ROLES,
@@ -118,6 +118,7 @@ export interface GameHudProps {
   clueNotice: { title: string; detail: string } | null;
   killFlash?: boolean;
   compassYaw?: number;
+  subscribeCompassYaw?: (cb: (yaw: number) => void) => () => void;
   onToggleTouchControls: () => void;
   onTogglePointerLook: () => void;
   onResetCamera: () => void;
@@ -271,6 +272,25 @@ function PubgCompassStrip({
   );
 }
 
+const PubgCompassStripLive = memo(function PubgCompassStripLive({
+  initialYaw = 0,
+  subscribeCompassYaw,
+  compact,
+}: {
+  initialYaw?: number;
+  subscribeCompassYaw?: (cb: (yaw: number) => void) => () => void;
+  compact: boolean;
+}) {
+  const [yaw, setYaw] = useState(initialYaw);
+  useEffect(() => {
+    if (!subscribeCompassYaw) return;
+    return subscribeCompassYaw((nextYaw) => setYaw(nextYaw));
+  }, [subscribeCompassYaw]);
+  const effectiveYaw = subscribeCompassYaw ? yaw : initialYaw;
+  const deg = (((-effectiveYaw * 180) / Math.PI) % 360 + 360) % 360;
+  return <PubgCompassStrip bearingDeg={deg} compact={compact} />;
+});
+
 interface TacticalActionSlot {
   id: string;
   label: string;
@@ -409,173 +429,209 @@ function TacticalCircleButton({
   );
 }
 
-const MinimapStaticZones = memo(function MinimapStaticZones() {
+const MINIMAP_WORLD_HALF = MAP_HALF_SIZE + 10;
+const MINIMAP_WORLD_SPAN = MINIMAP_WORLD_HALF * 2;
+let cachedMinimapDataUrl: string | null = null;
+
+function getMinimapStaticDataUrl(): string {
+  if (cachedMinimapDataUrl) return cachedMinimapDataUrl;
+  if (typeof document === 'undefined') return '';
+  const size = 768;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return '';
+
+  const s = size / MINIMAP_WORLD_SPAN;
+  const wx = (x: number) => (x + MINIMAP_WORLD_HALF) * s;
+  const wz = (z: number) => (z + MINIMAP_WORLD_HALF) * s;
+
+  ctx.fillStyle = '#060b14';
+  ctx.fillRect(0, 0, size, size);
+
+  ctx.fillStyle = '#0b1322';
+  ctx.fillRect(wx(-MAP_HALF_SIZE), wz(-MAP_HALF_SIZE), MAP_HALF_SIZE * 2 * s, MAP_HALF_SIZE * 2 * s);
+
+  ctx.fillStyle = 'rgba(30, 41, 59, 0.68)';
+  ctx.fillRect(wx(-9), wz(-MAP_HALF_SIZE), 18 * s, MAP_HALF_SIZE * 2 * s);
+  ctx.fillRect(wx(-MAP_HALF_SIZE), wz(-9), MAP_HALF_SIZE * 2 * s, 18 * s);
+
+  ctx.save();
+  ctx.strokeStyle = '#334155';
+  ctx.lineWidth = 3.6 * s;
+  ctx.setLineDash([3 * s, 2 * s]);
+  ctx.strokeRect(wx(-54), wz(-54), 108 * s, 108 * s);
+  ctx.restore();
+
+  const drawRoadLine = (x1: number, y1: number, x2: number, y2: number, lw: number) => {
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = lw * s;
+    ctx.beginPath();
+    ctx.moveTo(wx(x1), wz(y1));
+    ctx.lineTo(wx(x2), wz(y2));
+    ctx.stroke();
+  };
+  drawRoadLine(-154, -114, 154, -114, 3.4);
+  drawRoadLine(-154, -72, 154, -72, 3.2);
+  drawRoadLine(-154, -52, 154, -52, 3.2);
+  drawRoadLine(-154, 52, 154, 52, 3.2);
+  drawRoadLine(-154, 72, 154, 72, 3.2);
+  drawRoadLine(-154, 96, 154, 96, 2.8);
+  drawRoadLine(-154, 112, 154, 112, 3.4);
+  drawRoadLine(-154, 144, 154, 144, 3.4);
+  drawRoadLine(-118, -154, -118, 154, 3.4);
+  drawRoadLine(-86, -154, -86, 154, 3.0);
+  drawRoadLine(-52, -154, -52, 154, 3.2);
+  drawRoadLine(52, -154, 52, 154, 3.2);
+  drawRoadLine(86, -154, 86, 154, 3.0);
+  drawRoadLine(118, -154, 118, 154, 3.4);
+
+  ctx.save();
+  ctx.strokeStyle = '#64748b';
+  ctx.lineWidth = 2.6 * s;
+  ctx.setLineDash([1.4 * s, 1.6 * s]);
+  ctx.beginPath();
+  ctx.moveTo(wx(-MAP_HALF_SIZE + 2), wz(RAILWAY_TRACK_Z));
+  ctx.lineTo(wx(MAP_HALF_SIZE - 2), wz(RAILWAY_TRACK_Z));
+  ctx.stroke();
+  ctx.restore();
+
+  for (const z of ZONES) {
+    ctx.save();
+    ctx.globalAlpha = 0.52;
+    ctx.fillStyle = z.color;
+    ctx.fillRect(wx(z.x - z.width / 2), wz(z.z - z.depth / 2), z.width * s, z.depth * s);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = '#64748b';
+    ctx.lineWidth = Math.max(0.8, 0.55 * s);
+    ctx.strokeRect(wx(z.x - z.width / 2), wz(z.z - z.depth / 2), z.width * s, z.depth * s);
+    ctx.restore();
+  }
+
+  for (const w of WALLS) {
+    if (w.id === 'pukur_water' || w.id === 'jheel_water') {
+      ctx.save();
+      ctx.globalAlpha = 0.85;
+      ctx.fillStyle = '#0284c7';
+      ctx.fillRect(wx(w.minX), wz(w.minZ), (w.maxX - w.minX) * s, (w.maxZ - w.minZ) * s);
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = '#7dd3fc';
+      ctx.lineWidth = Math.max(0.8, 0.6 * s);
+      ctx.strokeRect(wx(w.minX), wz(w.minZ), (w.maxX - w.minX) * s, (w.maxZ - w.minZ) * s);
+      ctx.restore();
+    } else {
+      ctx.fillStyle = w.id.startsWith('outer_')
+        ? 'rgba(71, 85, 105, 0.9)'
+        : w.height <= 1.9
+          ? 'rgba(120, 53, 15, 0.9)'
+          : 'rgba(148, 163, 184, 0.9)';
+      ctx.fillRect(
+        wx(w.minX),
+        wz(w.minZ),
+        Math.max(1.0, w.maxX - w.minX) * s,
+        Math.max(1.0, w.maxZ - w.minZ) * s,
+      );
+    }
+  }
+
+  ctx.save();
+  ctx.setLineDash([1.8 * s, 1.2 * s]);
+  for (const r of ROOFTOPS) {
+    ctx.fillStyle = 'rgba(56, 189, 248, 0.12)';
+    ctx.fillRect(wx(r.minX), wz(r.minZ), (r.maxX - r.minX) * s, (r.maxZ - r.minZ) * s);
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.6)';
+    ctx.lineWidth = Math.max(0.7, 0.5 * s);
+    ctx.strokeRect(wx(r.minX), wz(r.minZ), (r.maxX - r.minX) * s, (r.maxZ - r.minZ) * s);
+  }
+  ctx.restore();
+
+  for (const st of STAIR_RAMPS) {
+    ctx.fillStyle = 'rgba(245, 158, 11, 0.48)';
+    ctx.fillRect(wx(st.minX), wz(st.minZ), (st.maxX - st.minX) * s, (st.maxZ - st.minZ) * s);
+    ctx.strokeStyle = '#fde68a';
+    ctx.lineWidth = Math.max(0.7, 0.5 * s);
+    ctx.strokeRect(wx(st.minX), wz(st.minZ), (st.maxX - st.minX) * s, (st.maxZ - st.minZ) * s);
+  }
+
+  const drawDot = (x: number, z: number, color: string) => {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(wx(x), wz(z), 1.6 * s, 0, Math.PI * 2);
+    ctx.fill();
+  };
+  drawDot(SECURITY_CAMS_POS.x, SECURITY_CAMS_POS.z, '#fb7185');
+  drawDot(ADMIN_TABLE_POS.x, ADMIN_TABLE_POS.z, '#38bdf8');
+  drawDot(VITALS_POS.x, VITALS_POS.z, '#34d399');
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `800 ${Math.max(8, 4.1 * s)}px system-ui, -apple-system, sans-serif`;
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = Math.max(2, 1.5 * s);
+  ctx.strokeStyle = '#090f1d';
+  ctx.fillStyle = '#f8fafc';
+  for (const z of ZONES) {
+    const label = SHORT_ZONE_LABELS[z.id] ?? z.banglaName;
+    const lx = wx(z.x);
+    const lz = wz(z.z - z.depth / 2 + 3.4);
+    ctx.strokeText(label, lx, lz);
+    ctx.fillText(label, lx, lz);
+  }
+
+  cachedMinimapDataUrl = canvas.toDataURL('image/png');
+  return cachedMinimapDataUrl;
+}
+
+const RadarFovCone = memo(function RadarFovCone({
+  px,
+  pz,
+  compassYaw,
+  subscribeCompassYaw,
+}: {
+  px: number;
+  pz: number;
+  compassYaw: number;
+  subscribeCompassYaw?: (cb: (yaw: number) => void) => () => void;
+}) {
+  const gRef = useRef<SVGGElement | null>(null);
+  const yawRef = useRef(compassYaw);
+  const posRef = useRef({ px, pz });
+  posRef.current = { px, pz };
+
+  useEffect(() => {
+    if (!subscribeCompassYaw) {
+      yawRef.current = compassYaw;
+      const deg = (((-compassYaw * 180) / Math.PI) % 360 + 360) % 360;
+      gRef.current?.setAttribute('transform', `translate(${px}, ${pz}) rotate(${deg})`);
+      return;
+    }
+    return subscribeCompassYaw((nextYaw) => {
+      yawRef.current = nextYaw;
+      const deg = (((-nextYaw * 180) / Math.PI) % 360 + 360) % 360;
+      const p = posRef.current;
+      gRef.current?.setAttribute('transform', `translate(${p.px}, ${p.pz}) rotate(${deg})`);
+    });
+  }, [subscribeCompassYaw, compassYaw, px, pz]);
+
+  const initialDeg = (((-yawRef.current * 180) / Math.PI) % 360 + 360) % 360;
   return (
-    <>
-      <rect
-        x={-MAP_HALF_SIZE - 80}
-        y={-MAP_HALF_SIZE - 80}
-        width={(MAP_HALF_SIZE + 80) * 2}
-        height={(MAP_HALF_SIZE + 80) * 2}
-        fill="#060b14"
-      />
-      <rect
-        x={-MAP_HALF_SIZE}
-        y={-MAP_HALF_SIZE}
-        width={MAP_HALF_SIZE * 2}
-        height={MAP_HALF_SIZE * 2}
-        fill="#0b1322"
-        rx="2"
-      />
-      {/* Main Crossroads, Outer Boulevard & South Rail Crossing */}
-      <rect x={-9} y={-MAP_HALF_SIZE} width={18} height={MAP_HALF_SIZE * 2} fill="#1e293b" opacity={0.68} />
-      <rect x={-MAP_HALF_SIZE} y={-9} width={MAP_HALF_SIZE * 2} height={18} fill="#1e293b" opacity={0.68} />
-      <rect
-        x={-54}
-        y={-54}
-        width={108}
-        height={108}
-        fill="none"
-        stroke="#334155"
-        strokeWidth="3.6"
-        strokeDasharray="3 2"
-      />
-      <line x1={-154} y1={-114} x2={154} y2={-114} stroke="#334155" strokeWidth="3.4" />
-      <line x1={-154} y1={-72} x2={154} y2={-72} stroke="#334155" strokeWidth="3.2" />
-      <line x1={-154} y1={-52} x2={154} y2={-52} stroke="#334155" strokeWidth="3.2" />
-      <line x1={-154} y1={52} x2={154} y2={52} stroke="#334155" strokeWidth="3.2" />
-      <line x1={-154} y1={72} x2={154} y2={72} stroke="#334155" strokeWidth="3.2" />
-      <line x1={-154} y1={96} x2={154} y2={96} stroke="#334155" strokeWidth="2.8" />
-      <line x1={-154} y1={112} x2={154} y2={112} stroke="#334155" strokeWidth="3.4" />
-      <line x1={-154} y1={144} x2={154} y2={144} stroke="#334155" strokeWidth="3.4" />
-      <line x1={-118} y1={-154} x2={-118} y2={154} stroke="#334155" strokeWidth="3.4" />
-      <line x1={-86} y1={-154} x2={-86} y2={154} stroke="#334155" strokeWidth="3.0" />
-      <line x1={-52} y1={-154} x2={-52} y2={154} stroke="#334155" strokeWidth="3.2" />
-      <line x1={52} y1={-154} x2={52} y2={154} stroke="#334155" strokeWidth="3.2" />
-      <line x1={86} y1={-154} x2={86} y2={154} stroke="#334155" strokeWidth="3.0" />
-      <line x1={118} y1={-154} x2={118} y2={154} stroke="#334155" strokeWidth="3.4" />
-      <line
-        x1={-MAP_HALF_SIZE + 2}
-        y1={RAILWAY_TRACK_Z}
-        x2={MAP_HALF_SIZE - 2}
-        y2={RAILWAY_TRACK_Z}
-        stroke="#64748b"
-        strokeWidth="2.6"
-        strokeDasharray="1.4 1.6"
-      />
-
-      {ZONES.map((z) => (
-        <rect
-          key={z.id}
-          x={z.x - z.width / 2}
-          y={z.z - z.depth / 2}
-          width={z.width}
-          height={z.depth}
-          fill={z.color}
-          fillOpacity={0.52}
-          stroke="#64748b"
-          strokeWidth="0.55"
-          rx="1.5"
-        />
-      ))}
-
-      {/* Precision WALLS + Pukur & Jheel Par Water */}
-      {WALLS.map((w) =>
-        w.id === 'pukur_water' || w.id === 'jheel_water' ? (
-          <rect
-            key={w.id}
-            x={w.minX}
-            y={w.minZ}
-            width={w.maxX - w.minX}
-            height={w.maxZ - w.minZ}
-            fill="#0284c7"
-            fillOpacity={0.85}
-            stroke="#7dd3fc"
-            strokeWidth="0.6"
-            rx="1"
-          />
-        ) : (
-          <rect
-            key={w.id}
-            x={w.minX}
-            y={w.minZ}
-            width={Math.max(1.0, w.maxX - w.minX)}
-            height={Math.max(1.0, w.maxZ - w.minZ)}
-            fill={w.id.startsWith('outer_') ? '#475569' : w.height <= 1.9 ? '#78350f' : '#94a3b8'}
-            fillOpacity={0.9}
-          />
-        ),
-      )}
-
-      {/* Walkable Chhad Rooftops + Exterior Stairways */}
-      {ROOFTOPS.map((r) => (
-        <rect
-          key={r.id}
-          x={r.minX}
-          y={r.minZ}
-          width={r.maxX - r.minX}
-          height={r.maxZ - r.minZ}
-          fill="#38bdf8"
-          fillOpacity={0.12}
-          stroke="#38bdf8"
-          strokeOpacity={0.6}
-          strokeWidth="0.5"
-          strokeDasharray="1.8 1.2"
-        />
-      ))}
-      {STAIR_RAMPS.map((st) => (
-        <rect
-          key={st.id}
-          x={st.minX}
-          y={st.minZ}
-          width={st.maxX - st.minX}
-          height={st.maxZ - st.minZ}
-          fill="#f59e0b"
-          fillOpacity={0.48}
-          stroke="#fde68a"
-          strokeWidth="0.5"
-          rx="0.4"
-        />
-      ))}
-
-      <circle cx={SECURITY_CAMS_POS.x} cy={SECURITY_CAMS_POS.z} r={1.6} fill="#fb7185" />
-      <circle cx={ADMIN_TABLE_POS.x} cy={ADMIN_TABLE_POS.z} r={1.6} fill="#38bdf8" />
-      <circle cx={VITALS_POS.x} cy={VITALS_POS.z} r={1.6} fill="#34d399" />
-    </>
-  );
-});
-
-const MinimapStaticLabels = memo(function MinimapStaticLabels() {
-  return (
-    <>
-      {ZONES.map((z) => (
-        <text
-          key={`${z.id}-lbl`}
-          x={z.x}
-          y={z.z - z.depth / 2 + 4.4}
-          textAnchor="middle"
-          fill="#f8fafc"
-          stroke="#090f1d"
-          strokeWidth="1.5"
-          paintOrder="stroke"
-          fontSize="4.1"
-          fontWeight="800"
-        >
-          {SHORT_ZONE_LABELS[z.id] ?? z.banglaName}
-        </text>
-      ))}
-    </>
+    <g ref={gRef} transform={`translate(${px}, ${pz}) rotate(${initialDeg})`}>
+      <path d="M 0 0 L -14 -28 A 31 31 0 0 1 14 -28 Z" fill="#38bdf8" fillOpacity={0.28} />
+    </g>
   );
 });
 
 const FF_RADAR_RADIUS = 54;
 const FF_RIM_RADIUS = 49.5;
+const MINIMAP_IMG_SCALE_PCT = (MINIMAP_WORLD_SPAN / (FF_RADAR_RADIUS * 2)) * 100;
 
 const FreeFireMinimap = memo(function FreeFireMinimap({
   px,
   pz,
   playerYaw,
   compassYaw,
+  subscribeCompassYaw,
   zoneLabel,
   showTasks,
   tasks,
@@ -590,6 +646,7 @@ const FreeFireMinimap = memo(function FreeFireMinimap({
   pz: number;
   playerYaw: number;
   compassYaw: number;
+  subscribeCompassYaw?: (cb: (yaw: number) => void) => () => void;
   zoneLabel: string;
   showTasks: boolean;
   tasks: Array<{ taskId: string; completed: boolean }>;
@@ -600,6 +657,7 @@ const FreeFireMinimap = memo(function FreeFireMinimap({
   compact: boolean;
   onOpenTacticalMap: () => void;
 }) {
+  const minimapImgUrl = getMinimapStaticDataUrl();
   const sabTargets: Array<{ id: string; x: number; z: number; held: boolean }> =
     sabotage.active === 'gas_leak'
       ? sabotage.valves.map((v) => ({ id: v.id, x: v.x, z: v.z, held: Boolean(v.holderId) }))
@@ -646,15 +704,29 @@ const FreeFireMinimap = memo(function FreeFireMinimap({
           প
         </span>
 
-        {/* Inner Clipped Circular Radar Viewport (Player-Centered 108m x 108m Window) */}
-        <div className="w-full h-full rounded-full overflow-hidden relative">
+        {/* Inner Clipped Circular Radar Viewport (GPU-blitted cached bitmap + ultra-lightweight dynamic markers) */}
+        <div className="w-full h-full rounded-full overflow-hidden relative bg-[#060b14]">
+          {minimapImgUrl && (
+            <img
+              src={minimapImgUrl}
+              alt=""
+              aria-hidden="true"
+              draggable={false}
+              className="pointer-events-none select-none absolute left-1/2 top-1/2"
+              style={{
+                width: `${MINIMAP_IMG_SCALE_PCT}%`,
+                height: `${MINIMAP_IMG_SCALE_PCT}%`,
+                maxWidth: 'none',
+                transform: `translate3d(calc(-50% - ${(px / MINIMAP_WORLD_SPAN) * 100}%), calc(-50% - ${(pz / MINIMAP_WORLD_SPAN) * 100}%), 0)`,
+                willChange: 'transform',
+              }}
+            />
+          )}
           <svg
             viewBox={`${px - FF_RADAR_RADIUS} ${pz - FF_RADAR_RADIUS} ${FF_RADAR_RADIUS * 2} ${FF_RADAR_RADIUS * 2}`}
-            className="w-full h-full block"
+            className="w-full h-full block relative z-10"
             aria-hidden="true"
           >
-            <MinimapStaticZones />
-
             {/* Live Door Shutter States */}
             {DOORS.map((d) => {
               const locked = doorLocks[d.zoneId] > 0;
@@ -670,8 +742,6 @@ const FreeFireMinimap = memo(function FreeFireMinimap({
                 />
               );
             })}
-
-            <MinimapStaticLabels />
 
             {/* Vehicle Pips on Minimap Radar */}
             {vehicles?.map((v) => {
@@ -806,15 +876,12 @@ const FreeFireMinimap = memo(function FreeFireMinimap({
             })}
 
             {/* Camera FOV Cone + Local Player Arrow */}
-            <g
-              transform={`translate(${px}, ${pz}) rotate(${(((-compassYaw * 180) / Math.PI) % 360 + 360) % 360})`}
-            >
-              <path
-                d="M 0 0 L -14 -28 A 31 31 0 0 1 14 -28 Z"
-                fill="#38bdf8"
-                fillOpacity={0.28}
-              />
-            </g>
+            <RadarFovCone
+              px={px}
+              pz={pz}
+              compassYaw={compassYaw}
+              subscribeCompassYaw={subscribeCompassYaw}
+            />
             <g transform={`translate(${px}, ${pz}) rotate(${180 - (playerYaw * 180) / Math.PI})`}>
               <polygon
                 points="0,-4.4 3.4,3.1 0,1.4 -3.4,3.1"
@@ -857,6 +924,7 @@ export const GameHud = memo(function GameHud({
   clueNotice,
   killFlash = false,
   compassYaw = 0,
+  subscribeCompassYaw,
   onToggleTouchControls,
   onTogglePointerLook,
   onResetCamera,
@@ -1182,6 +1250,7 @@ export const GameHud = memo(function GameHud({
               pz={localPlayer.z}
               playerYaw={localPlayer.yaw}
               compassYaw={compassYaw}
+              subscribeCompassYaw={subscribeCompassYaw}
               zoneLabel={currentZoneDef ? currentZoneDef.banglaName : currentZone}
               showTasks={!isVondo && !isNeutral && !wifiHidden}
               tasks={localPlayer.tasks}
@@ -1510,8 +1579,9 @@ export const GameHud = memo(function GameHud({
         {/* Top-Center PUBG Bearing Compass Strip (auto-sized flex center slot -> zero overlap) */}
         {!clueNotice && viewport.w >= 540 && (
           <div className="flex-1 min-w-0 flex justify-center pt-0.5 pointer-events-none">
-            <PubgCompassStrip
-              bearingDeg={(((-compassYaw * 180) / Math.PI) % 360 + 360) % 360}
+            <PubgCompassStripLive
+              initialYaw={compassYaw}
+              subscribeCompassYaw={subscribeCompassYaw}
               compact={isLandscapeCompact || viewport.w < 960}
             />
           </div>
