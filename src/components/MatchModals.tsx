@@ -911,6 +911,9 @@ export function PauseModal({
         className="w-full max-w-sm rounded-2xl p-6 border border-white/15 shadow-2xl space-y-4 text-center"
         style={{ backgroundColor: 'rgba(15, 23, 42, 0.98)' }}
       >
+        <div className="text-[11px] font-bold tracking-wider text-amber-300 font-mono-tabular">
+          KE BATPAR 2.0 · v2.0
+        </div>
         <h2 className="font-display text-2xl font-bold text-white">গেম পজ</h2>
         <p className="text-xs text-slate-400">মহল্লায় ফেরার আগে একটু চা খেয়ে নাও।</p>
         <div className="space-y-2.5 pt-2">

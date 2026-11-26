@@ -220,11 +220,17 @@
   will-change: transform, opacity;
 }
 
-@media (prefers-reduced-motion: reduce) {
+@media (prefers-reduced-motion: reduce), (hover: none) and (pointer: coarse), (max-width: 767px) {
   .kb-beam-sweep,
   .kb-ember-drift,
   .kb-emblem-hover,
-  .kb-cta-sheen,
+  .kb-cta-sheen {
+    animation: none !important;
+    will-change: auto !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
   .animate-amg-runner,
   .animate-amg-loading-bar {
     animation: none !important;

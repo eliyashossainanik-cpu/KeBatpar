@@ -106,7 +106,23 @@ function heightCanvasToNormalMap(
   repeatX: number,
   repeatY: number,
   maxAniso: number,
+  flatOnly = false,
 ): THREE.DataTexture {
+  if (flatOnly) {
+    const flatDst = new Uint8Array([
+      128, 128, 255, 255, 128, 128, 255, 255,
+      128, 128, 255, 255, 128, 128, 255, 255,
+    ]);
+    const tex = new THREE.DataTexture(flatDst, 2, 2, THREE.RGBAFormat);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(repeatX, repeatY);
+    tex.generateMipmaps = false;
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
+    tex.needsUpdate = true;
+    return tex;
+  }
+
   const w = canvas.width;
   const h = canvas.height;
   const ctx = canvas.getContext('2d')!;
@@ -198,7 +214,7 @@ function makeSignTexture(
   quality: boolean | TextureQualityMode = false,
 ): THREE.CanvasTexture {
   const mode = resolveQualityMode(quality);
-  const scale: number = mode === 'low' ? 0.6667 : mode === 'medium' ? 1 : 1.3334;
+  const scale: number = mode === 'low' ? 0.6667 : mode === 'medium' ? 0.75 : 1.3334;
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(768 * scale);
   canvas.height = Math.round(256 * scale);
@@ -283,7 +299,7 @@ function makePosterTexture(
   quality: boolean | TextureQualityMode = false,
 ): THREE.CanvasTexture {
   const mode = resolveQualityMode(quality);
-  const scale = mode === 'low' ? 1 : mode === 'medium' ? 1.5 : 2;
+  const scale = mode === 'low' ? 1 : mode === 'medium' ? 1 : 2;
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(256 * scale);
   canvas.height = Math.round(320 * scale);
@@ -332,7 +348,7 @@ function makeHoardingTexture(
   quality: boolean | TextureQualityMode = false,
 ): THREE.CanvasTexture {
   const mode = resolveQualityMode(quality);
-  const scale: number = mode === 'low' ? 0.5 : mode === 'medium' ? 1 : 1.5;
+  const scale: number = mode === 'low' ? 0.5 : mode === 'medium' ? 0.75 : 1.5;
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(1024 * scale);
   canvas.height = Math.round(512 * scale);
@@ -420,7 +436,7 @@ function makeGantryBannerTexture(
   quality: boolean | TextureQualityMode = false,
 ): THREE.CanvasTexture {
   const mode = resolveQualityMode(quality);
-  const scale: number = mode === 'low' ? 0.5 : mode === 'medium' ? 1 : 1.5;
+  const scale: number = mode === 'low' ? 0.5 : mode === 'medium' ? 0.75 : 1.5;
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(1024 * scale);
   canvas.height = Math.round(224 * scale);
@@ -487,10 +503,11 @@ export function createProceduralTextures(
 ): ProceduralTextureSet {
   const qualityMode = resolveQualityMode(quality);
   const compactMode = qualityMode;
+  const skipNormalMaps = qualityMode !== 'high';
   const maxAniso = Math.max(1, Math.min(renderer.capabilities.getMaxAnisotropy(), maxAnisotropyCap));
-  const tileScale: number = qualityMode === 'low' ? 0.5 : qualityMode === 'medium' ? 1 : 2;
+  const tileScale: number = qualityMode === 'low' ? 0.5 : qualityMode === 'medium' ? 0.75 : 2;
   const tilePx = Math.round(512 * tileScale);
-  const subScale = qualityMode === 'low' ? 1 : qualityMode === 'medium' ? 1.5 : 2;
+  const subScale = qualityMode === 'low' ? 0.75 : qualityMode === 'medium' ? 1 : 2;
   const subPx = Math.round(256 * subScale);
 
   // 1. High-Detail Stone Cobble Albedo + Tangent Normal Map
@@ -535,7 +552,7 @@ export function createProceduralTextures(
   cobbleMap.repeat.set(12, 12);
   cobbleMap.anisotropy = maxAniso;
 
-  const cobbleNormal = heightCanvasToNormalMap(cobbleHeightCanvas, 2.2, 12, 12, maxAniso);
+  const cobbleNormal = heightCanvasToNormalMap(cobbleHeightCanvas, 2.2, 12, 12, maxAniso, skipNormalMaps);
 
   // 2. Seamless Mineral Tarmac Asphalt + Aggregate Micro-Normal + Matte/Worn Roughness Map
   const aspCanvas = document.createElement('canvas');
@@ -622,7 +639,7 @@ export function createProceduralTextures(
   asphaltMap.repeat.set(8, 8);
   asphaltMap.anisotropy = maxAniso;
 
-  const asphaltNormal = heightCanvasToNormalMap(aspHeightCanvas, 1.35, 8, 8, maxAniso);
+  const asphaltNormal = heightCanvasToNormalMap(aspHeightCanvas, 1.35, 8, 8, maxAniso, skipNormalMaps);
 
   const asphaltRoughness = new THREE.CanvasTexture(aspRoughCanvas);
   asphaltRoughness.colorSpace = THREE.NoColorSpace;
@@ -805,7 +822,7 @@ export function createProceduralTextures(
   tinBump.wrapS = tinBump.wrapT = THREE.RepeatWrapping;
   tinBump.repeat.set(5, 2);
   tinBump.anisotropy = maxAniso;
-  const tinNormal = heightCanvasToNormalMap(tinCanvas, 2.4, 5, 2, maxAniso);
+  const tinNormal = heightCanvasToNormalMap(tinCanvas, 2.4, 5, 2, maxAniso, skipNormalMaps);
 
   // 4. Weathered Dhaka Brick Wall Albedo + Deep Mortar Normal Map
   const wallCanvas = document.createElement('canvas');
@@ -849,7 +866,7 @@ export function createProceduralTextures(
   wallBrickMap.repeat.set(4, 1);
   wallBrickMap.anisotropy = maxAniso;
 
-  const wallBrickNormal = heightCanvasToNormalMap(wallHeightCanvas, 2.8, 4, 1, maxAniso);
+  const wallBrickNormal = heightCanvasToNormalMap(wallHeightCanvas, 2.8, 4, 1, maxAniso, skipNormalMaps);
 
   // 4a-2. Helper for Distinct Architectural Building Wall Textures (Plaster, Concrete Block, Steel, Glazed Tile)
   const makeBuildingWallTex = (
@@ -983,7 +1000,7 @@ export function createProceduralTextures(
     stHCtx.fillStyle = `rgb(${v},${v},${v})`;
     stHCtx.fillRect(sx, sy, 2, 2);
   }
-  const stuccoNormal = heightCanvasToNormalMap(stuccoHeightCv, 1.35, 3, 1, maxAniso);
+  const stuccoNormal = heightCanvasToNormalMap(stuccoHeightCv, 1.35, 3, 1, maxAniso, skipNormalMaps);
 
   const blockHeightCv = document.createElement('canvas');
   blockHeightCv.width = subPx;
@@ -1007,7 +1024,7 @@ export function createProceduralTextures(
       blHCtx.stroke();
     }
   }
-  const blockNormal = heightCanvasToNormalMap(blockHeightCv, 2.2, 3, 1, maxAniso);
+  const blockNormal = heightCanvasToNormalMap(blockHeightCv, 2.2, 3, 1, maxAniso, skipNormalMaps);
 
   const tileHeightCv = document.createElement('canvas');
   tileHeightCv.width = subPx;
@@ -1030,7 +1047,7 @@ export function createProceduralTextures(
     tlHCtx.lineTo(x, 256);
     tlHCtx.stroke();
   }
-  const tileNormal = heightCanvasToNormalMap(tileHeightCv, 2.0, 5, 5, maxAniso);
+  const tileNormal = heightCanvasToNormalMap(tileHeightCv, 2.0, 5, 5, maxAniso, skipNormalMaps);
 
   const concRoughCv = document.createElement('canvas');
   concRoughCv.width = subPx;
@@ -1089,7 +1106,7 @@ export function createProceduralTextures(
   const rickshawHoodMap = new THREE.CanvasTexture(hoodCv);
   rickshawHoodMap.colorSpace = THREE.SRGBColorSpace;
   rickshawHoodMap.anisotropy = maxAniso;
-  const rickshawHoodNormal = heightCanvasToNormalMap(hoodHCv, 2.1, 1, 1, maxAniso);
+  const rickshawHoodNormal = heightCanvasToNormalMap(hoodHCv, 2.1, 1, 1, maxAniso, skipNormalMaps);
 
   // 4b. PUBG-Style Slatted Wooden Supply Crate Albedo + Normal Map
   const crateCanvas = document.createElement('canvas');
@@ -1133,7 +1150,7 @@ export function createProceduralTextures(
   const crateWoodMap = new THREE.CanvasTexture(crateCanvas);
   crateWoodMap.colorSpace = THREE.SRGBColorSpace;
   crateWoodMap.anisotropy = maxAniso;
-  const crateWoodNormal = heightCanvasToNormalMap(crateHeightCanvas, 2.5, 1, 1, maxAniso);
+  const crateWoodNormal = heightCanvasToNormalMap(crateHeightCanvas, 2.5, 1, 1, maxAniso, skipNormalMaps);
 
   // 4c. Woven Jute Burlap Rice Sack Texture (Chaler Bosta)
   const sackCanvas = document.createElement('canvas');

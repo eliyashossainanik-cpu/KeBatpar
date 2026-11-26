@@ -234,46 +234,51 @@ export function TitleOverlay({
         <div className="hidden lg:block absolute bottom-10 right-8 w-8 h-8 border-b border-r border-sky-300/20" />
       </div>
 
-      {/* Top-Right Tactical Utility Rail */}
-      <div className="fixed top-3 right-3 sm:top-5 sm:right-6 z-30 pointer-events-auto flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => {
-            soundEngine.toggleBgm();
-          }}
-          aria-label={bgmEnabled ? 'মিউজিক বন্ধ করো' : 'মিউজিক চালু করো'}
-          title="ব্যাকগ্রাউন্ড মিউজিক"
-          className={`min-h-[42px] px-3.5 py-2 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 cursor-pointer shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 ${
-            bgmEnabled
-              ? 'border-emerald-400/40 bg-[#09111d]/88 hover:bg-[#0d1828] text-emerald-200'
-              : 'border-white/15 bg-[#090e1b]/88 hover:bg-[#11192c] text-slate-300'
-          }`}
-        >
-          {bgmEnabled ? (
-            <Volume2 className="w-4 h-4 text-emerald-300 shrink-0" />
-          ) : (
-            <VolumeX className="w-4 h-4 text-rose-400 shrink-0" />
-          )}
-          <span>{bgmEnabled ? 'মিউজিক চালু' : 'মিউজিক বন্ধ'}</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            void toggleFullscreenMode(true);
-          }}
-          aria-label={isFullscreen ? 'ফুলস্ক্রিন বন্ধ করো' : 'ফুলস্ক্রিন চালু করো'}
-          className="min-h-[42px] px-3.5 py-2 rounded-xl border border-amber-400/35 bg-[#090e1b]/88 hover:bg-[#121b30] text-amber-200 text-xs font-semibold flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 cursor-pointer shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
-        >
-          {isFullscreen ? <Minimize2 className="w-4 h-4 shrink-0" /> : <Maximize2 className="w-4 h-4 shrink-0" />}
-          <span>{isFullscreen ? 'ছোট স্ক্রিন' : 'ফুলস্ক্রিন'}</span>
-        </button>
+      {/* Responsive Top Tactical Utility Rail (flow header on mobile, fixed top-right on desktop) */}
+      <div className="relative md:fixed md:top-5 md:right-6 z-30 pointer-events-auto flex items-center justify-between md:justify-end gap-2 px-3.5 pt-2.5 pb-1 md:p-0 shrink-0">
+        <div className="md:hidden text-[11px] font-bold tracking-wide text-amber-300 font-mono-tabular truncate">
+          KE BATPAR 2.0 · v2.0
+        </div>
+        <div className="flex items-center gap-1.5 sm:gap-2 ml-auto">
+          <button
+            type="button"
+            onClick={() => {
+              soundEngine.toggleBgm();
+            }}
+            aria-label={bgmEnabled ? 'মিউজিক বন্ধ করো' : 'মিউজিক চালু করো'}
+            title="ব্যাকগ্রাউন্ড মিউজিক"
+            className={`min-h-[40px] sm:min-h-[42px] px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl border text-[11px] sm:text-xs font-semibold flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 cursor-pointer shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 ${
+              bgmEnabled
+                ? 'border-emerald-400/40 bg-[#09111d]/90 hover:bg-[#0d1828] text-emerald-200'
+                : 'border-white/15 bg-[#090e1b]/90 hover:bg-[#11192c] text-slate-300'
+            }`}
+          >
+            {bgmEnabled ? (
+              <Volume2 className="w-4 h-4 text-emerald-300 shrink-0" />
+            ) : (
+              <VolumeX className="w-4 h-4 text-rose-400 shrink-0" />
+            )}
+            <span className="hidden xs:inline sm:inline">{bgmEnabled ? 'মিউজিক চালু' : 'মিউজিক বন্ধ'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              void toggleFullscreenMode(true);
+            }}
+            aria-label={isFullscreen ? 'ফুলস্ক্রিন বন্ধ করো' : 'ফুলস্ক্রিন চালু করো'}
+            className="min-h-[40px] sm:min-h-[42px] px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl border border-amber-400/35 bg-[#090e1b]/90 hover:bg-[#121b30] text-amber-200 text-[11px] sm:text-xs font-semibold flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 cursor-pointer shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+          >
+            {isFullscreen ? <Minimize2 className="w-4 h-4 shrink-0" /> : <Maximize2 className="w-4 h-4 shrink-0" />}
+            <span>{isFullscreen ? 'ছোট স্ক্রিন' : 'ফুলস্ক্রিন'}</span>
+          </button>
+        </div>
       </div>
 
       {/* Main Left Launch Stage */}
-      <main className="relative z-10 flex flex-col justify-center [@media(max-height:540px)]:justify-start flex-1 px-4 pt-16 pb-4 sm:py-6 [@media(max-height:540px)]:pt-14 [@media(max-height:540px)]:pb-2 sm:px-10 lg:px-14 [@media(max-height:540px)]:px-5 max-w-[560px] [@media(max-height:540px)]:max-w-lg pointer-events-auto">
+      <main className="relative z-10 flex flex-col justify-start sm:justify-center [@media(max-height:540px)]:justify-start flex-1 w-full px-3.5 pt-2 pb-5 sm:py-6 [@media(max-height:540px)]:pt-1 [@media(max-height:540px)]:pb-3 sm:px-10 lg:px-14 [@media(max-height:540px)]:px-4 max-w-[560px] [@media(max-height:540px)]:max-w-xl pointer-events-auto">
         {/* Hero Brand Lockup with Dynamic Color-Reactive Character Pedestal */}
-        <header className="mb-4 sm:mb-5 [@media(max-height:540px)]:mb-2 flex items-center gap-4 sm:gap-5">
-          <div className="relative shrink-0 w-16 h-[74px] sm:w-[78px] sm:h-[90px] [@media(max-height:540px)]:w-12 [@media(max-height:540px)]:h-14 flex items-center justify-center">
+        <header className="mb-3 sm:mb-5 [@media(max-height:540px)]:mb-2 flex items-center gap-3 sm:gap-5">
+          <div className="relative shrink-0 w-13 h-15 sm:w-[78px] sm:h-[90px] [@media(max-height:540px)]:w-11 [@media(max-height:540px)]:h-13 flex items-center justify-center">
             <div
               aria-hidden="true"
               className="absolute inset-0 rounded-full opacity-55 transition-colors duration-300"
@@ -289,7 +294,7 @@ export function TitleOverlay({
               viewBox="0 0 72 96"
               className="kb-emblem-hover relative w-full h-full drop-shadow-[0_12px_24px_rgba(0,0,0,0.7)]"
               role="img"
-              aria-label="KE BATPAR? চরিত্র"
+              aria-label="KE BATPAR 2.0 চরিত্র"
             >
               <path
                 d="M36 15 L36 5 M36 8 Q25 2 23 9 Q29 12 36 8 M36 8 Q47 2 49 9 Q43 12 36 8"
@@ -348,17 +353,17 @@ export function TitleOverlay({
 
           <div className="min-w-0 flex-1">
             <h1
-              className="text-[2.1rem] sm:text-[2.9rem] [@media(max-height:540px)]:text-2xl font-black tracking-tight leading-[0.98] text-slate-50 drop-shadow-[0_6px_18px_rgba(0,0,0,0.8)]"
+              className="text-[1.85rem] sm:text-[2.85rem] [@media(max-height:540px)]:text-2xl font-black tracking-tight leading-[0.98] text-slate-50 drop-shadow-[0_6px_18px_rgba(0,0,0,0.8)]"
               style={{ fontFamily: "'Bricolage Grotesque', 'Plus Jakarta Sans', sans-serif", textWrap: 'balance' }}
             >
               KE{' '}
               <span className="bg-gradient-to-b from-amber-200 via-amber-400 to-orange-500 bg-clip-text text-transparent">
-                BATPAR?
+                BATPAR 2.0
               </span>
             </h1>
 
-            <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs sm:text-sm font-bold text-amber-300">
-              <span>কে বাটপার?</span>
+            <div className="mt-1 sm:mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs sm:text-sm font-bold text-amber-300">
+              <span>কে বাটপার ২.০</span>
               <span aria-hidden="true" className="text-slate-500">·</span>
               <span className="text-slate-200 font-medium">৩ডি মহল্লা রহস্য ও কমেডি</span>
               {career.matchesPlayed > 0 && (
@@ -378,10 +383,10 @@ export function TitleOverlay({
           </div>
         </header>
 
-        {/* Tactical Game-Lobby Launch Console */}
+        {/* Tactical Game-Lobby Launch Console (Left Side Panel) */}
         <section
           aria-label="খেলোয়াড়ের পরিচয় ও ম্যাচ শুরু"
-          className="relative overflow-hidden rounded-2xl p-4 sm:p-5 [@media(max-height:540px)]:p-3 bg-[#090e1b]/88 border border-white/15 shadow-[0_28px_72px_-16px_rgba(0,0,0,0.92)]"
+          className="relative overflow-hidden rounded-2xl p-3.5 sm:p-5 [@media(max-height:540px)]:p-3 bg-[#090e1b]/92 border border-white/15 shadow-[0_28px_72px_-16px_rgba(0,0,0,0.92)]"
         >
           {/* Specular Top Hairline Highlight */}
           <div
@@ -389,8 +394,18 @@ export function TitleOverlay({
             className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-amber-300/60 to-transparent"
           />
 
+          {/* Side-Panel Version Readout */}
+          <div className="flex items-center justify-between gap-2 pb-2 mb-3 [@media(max-height:540px)]:mb-2 border-b border-white/10 text-[11px]">
+            <span className="font-display font-extrabold tracking-wide text-slate-200">
+              মহল্লা কন্ট্রোল প্যানেল
+            </span>
+            <span className="font-mono-tabular font-bold text-amber-300">
+              v2.0 · স্মুথ মোবাইল এডিশন
+            </span>
+          </div>
+
           {/* Tactical Mode Segmented Switcher */}
-          <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-slate-900/90 border border-white/10 mb-4 [@media(max-height:540px)]:mb-2.5">
+          <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-slate-900/90 border border-white/10 mb-3.5 [@media(max-height:540px)]:mb-2">
             <button
               type="button"
               onClick={() => {
@@ -467,7 +482,7 @@ export function TitleOverlay({
                   <span className="text-amber-200 font-semibold">{selectedSpec.label}</span>
                 </div>
                 <div
-                  className="grid grid-cols-5 gap-2 [@media(max-height:540px)]:gap-1.5 w-fit"
+                  className="grid grid-cols-5 gap-1.5 sm:gap-2 [@media(max-height:540px)]:gap-1 w-full sm:w-fit"
                   role="radiogroup"
                   aria-label="চরিত্রের রঙ বেছে নাও"
                 >
@@ -481,13 +496,17 @@ export function TitleOverlay({
                         aria-label={`রঙ ${c.label}`}
                         aria-checked={active}
                         role="radio"
-                        className={`w-7 h-7 sm:w-6 sm:h-6 [@media(max-height:540px)]:w-5 [@media(max-height:540px)]:h-5 rounded-full transition-transform cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 ${
-                          active
-                            ? 'ring-2 ring-amber-300 ring-offset-2 ring-offset-[#090e1b] scale-110'
-                            : 'ring-1 ring-white/25 hover:scale-105'
-                        }`}
-                        style={{ backgroundColor: c.hex }}
-                      />
+                        className="w-10 h-10 sm:w-7 sm:h-7 [@media(max-height:540px)]:w-8 [@media(max-height:540px)]:h-8 flex items-center justify-center rounded-full cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+                      >
+                        <span
+                          className={`block w-7 h-7 sm:w-6 sm:h-6 [@media(max-height:540px)]:w-5 [@media(max-height:540px)]:h-5 rounded-full transition-transform ${
+                            active
+                              ? 'ring-2 ring-amber-300 ring-offset-2 ring-offset-[#090e1b] scale-110'
+                              : 'ring-1 ring-white/25 hover:scale-105'
+                          }`}
+                          style={{ backgroundColor: c.hex }}
+                        />
+                      </button>
                     );
                   })}
                 </div>
@@ -543,7 +562,7 @@ export function TitleOverlay({
             <div className="space-y-3 [@media(max-height:540px)]:space-y-2">
               {/* Special Role Selector */}
               <div className="rounded-xl bg-slate-900/75 border border-white/10 p-2.5 sm:px-3 sm:py-2.5">
-                <div className="flex items-center justify-between gap-2.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <label
                     htmlFor="solo-role-select"
                     className="text-xs font-semibold text-slate-200 flex items-center gap-1.5 shrink-0"
@@ -555,7 +574,7 @@ export function TitleOverlay({
                     id="solo-role-select"
                     value={soloSpecial}
                     onChange={(e) => setSoloSpecial(e.target.value as SpecialRole | 'random')}
-                    className="flex-1 min-w-0 max-w-[260px] min-h-[38px] px-3 py-1.5 rounded-lg bg-slate-950/95 border border-white/15 text-xs font-semibold text-amber-200 focus:outline-none focus:border-amber-400 cursor-pointer"
+                    className="w-full sm:flex-1 sm:min-w-0 sm:max-w-[260px] min-h-[42px] sm:min-h-[38px] px-3 py-1.5 rounded-lg bg-slate-950/95 border border-white/15 text-xs font-semibold text-amber-200 focus:outline-none focus:border-amber-400 cursor-pointer"
                   >
                     {SOLO_SPECIAL_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>
@@ -578,28 +597,30 @@ export function TitleOverlay({
                   type="button"
                   onClick={() => setShowSoloSettings((v) => !v)}
                   aria-expanded={showSoloSettings}
-                  className="min-h-[40px] px-3 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/12 font-semibold text-slate-200 flex items-center gap-1.5 transition-colors whitespace-nowrap cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+                  className="w-full sm:w-auto min-h-[42px] sm:min-h-[40px] px-3 py-2 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/12 font-semibold text-slate-200 flex items-center justify-between sm:justify-start gap-1.5 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
                 >
-                  <SlidersHorizontal className="w-3.5 h-3.5 text-amber-300 shrink-0" />
-                  <span>নিয়ম বদলাও</span>
-                  <span aria-hidden="true" className="text-slate-500">·</span>
-                  <span className="font-mono-tabular text-amber-200/95">
-                    {soloPlayerCount} জন / {soloSettings.vondoCount} বাটপার / {soloSettings.tasksPerPlayer} কাজ
+                  <span className="flex items-center gap-1.5 min-w-0">
+                    <SlidersHorizontal className="w-3.5 h-3.5 text-amber-300 shrink-0" />
+                    <span>নিয়ম বদলাও</span>
+                    <span aria-hidden="true" className="text-slate-500">·</span>
+                    <span className="font-mono-tabular text-amber-200/95 truncate">
+                      {soloPlayerCount} জন / {soloSettings.vondoCount} বাটপার / {soloSettings.tasksPerPlayer} কাজ
+                    </span>
                   </span>
                   <ChevronDown
-                    className={`w-3.5 h-3.5 text-slate-400 transition-transform ${showSoloSettings ? 'rotate-180' : ''}`}
+                    className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${showSoloSettings ? 'rotate-180' : ''}`}
                   />
                 </button>
               </div>
 
               {showSoloSettings && (
-                <div className="p-3 rounded-xl bg-slate-900/70 border border-white/10 grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs text-slate-200">
-                  <label className="flex items-center justify-between gap-1.5">
+                <div className="p-3 rounded-xl bg-slate-900/75 border border-white/10 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2.5 text-xs text-slate-200">
+                  <label className="flex items-center justify-between gap-2 min-h-[38px]">
                     <span className="text-slate-400">খেলোয়াড়</span>
                     <select
                       value={soloPlayerCount}
                       onChange={(e) => onChangeSoloPlayerCount(Number(e.target.value))}
-                      className="px-2 py-1 rounded-lg bg-slate-950 border border-white/15 text-white font-mono-tabular"
+                      className="min-h-[38px] px-2.5 py-1 rounded-lg bg-slate-950 border border-white/15 text-white font-mono-tabular"
                     >
                       {[5, 6, 7, 8, 9, 10, 12, 15, 18, 20].map((cnt) => (
                         <option key={cnt} value={cnt}>
@@ -608,12 +629,12 @@ export function TitleOverlay({
                       ))}
                     </select>
                   </label>
-                  <label className="flex items-center justify-between gap-1.5">
+                  <label className="flex items-center justify-between gap-2 min-h-[38px]">
                     <span className="text-slate-400">বাটপার</span>
                     <select
                       value={soloSettings.vondoCount}
                       onChange={(e) => onUpdateSoloSettings({ vondoCount: Number(e.target.value) })}
-                      className="px-2 py-1 rounded-lg bg-slate-950 border border-white/15 text-white"
+                      className="min-h-[38px] px-2.5 py-1 rounded-lg bg-slate-950 border border-white/15 text-white"
                     >
                       <option value={1}>১ জন বাটপার</option>
                       <option value={2} disabled={soloPlayerCount < 6}>
@@ -630,24 +651,24 @@ export function TitleOverlay({
                       </option>
                     </select>
                   </label>
-                  <label className="flex items-center justify-between gap-1.5">
+                  <label className="flex items-center justify-between gap-2 min-h-[38px]">
                     <span className="text-slate-400">কিল বিরতি</span>
                     <select
                       value={soloSettings.killCooldownSec}
                       onChange={(e) => onUpdateSoloSettings({ killCooldownSec: Number(e.target.value) })}
-                      className="px-2 py-1 rounded-lg bg-slate-950 border border-white/15 text-white font-mono-tabular"
+                      className="min-h-[38px] px-2.5 py-1 rounded-lg bg-slate-950 border border-white/15 text-white font-mono-tabular"
                     >
                       <option value={12}>১২ সে.</option>
                       <option value={18}>১৮ সে.</option>
                       <option value={25}>২৫ সে.</option>
                     </select>
                   </label>
-                  <label className="flex items-center justify-between gap-1.5">
+                  <label className="flex items-center justify-between gap-2 min-h-[38px]">
                     <span className="text-slate-400">কাজ</span>
                     <select
                       value={soloSettings.tasksPerPlayer}
                       onChange={(e) => onUpdateSoloSettings({ tasksPerPlayer: Number(e.target.value) })}
-                      className="px-2 py-1 rounded-lg bg-slate-950 border border-white/15 text-white font-mono-tabular"
+                      className="min-h-[38px] px-2.5 py-1 rounded-lg bg-slate-950 border border-white/15 text-white font-mono-tabular"
                     >
                       {[4, 5, 6, 8, 10, 12, 15].map((cnt) => (
                         <option key={cnt} value={cnt}>
@@ -656,12 +677,12 @@ export function TitleOverlay({
                       ))}
                     </select>
                   </label>
-                  <label className="col-span-2 flex items-center justify-between gap-1.5">
+                  <label className="sm:col-span-2 flex items-center justify-between gap-2 min-h-[38px]">
                     <span className="text-slate-400">দৌড়ের গতি</span>
                     <select
                       value={soloSettings.moveSpeed}
                       onChange={(e) => onUpdateSoloSettings({ moveSpeed: Number(e.target.value) })}
-                      className="px-2 py-1 rounded-lg bg-slate-950 border border-white/15 text-white font-mono-tabular"
+                      className="min-h-[38px] px-2.5 py-1 rounded-lg bg-slate-950 border border-white/15 text-white font-mono-tabular"
                     >
                       <option value={7.65}>০.৮৫x (ধীরে)</option>
                       <option value={9}>১.০x (স্বাভাবিক)</option>
@@ -671,39 +692,39 @@ export function TitleOverlay({
                       <option value={18}>২.০x (ম্যাক্স)</option>
                     </select>
                   </label>
-                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <label className="flex items-center gap-2.5 min-h-[36px] cursor-pointer select-none">
                     <input
                       type="checkbox"
                       checked={soloSettings.confirmEjects}
                       onChange={(e) => onUpdateSoloSettings({ confirmEjects: e.target.checked })}
-                      className="accent-amber-400 w-3.5 h-3.5"
+                      className="accent-amber-400 w-4 h-4"
                     />
                     <span>আসল পরিচয় দেখাও</span>
                   </label>
-                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <label className="flex items-center gap-2.5 min-h-[36px] cursor-pointer select-none">
                     <input
                       type="checkbox"
                       checked={soloSettings.anonymousVotes}
                       onChange={(e) => onUpdateSoloSettings({ anonymousVotes: e.target.checked })}
-                      className="accent-amber-400 w-3.5 h-3.5"
+                      className="accent-amber-400 w-4 h-4"
                     />
                     <span>গোপন ভোট</span>
                   </label>
-                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <label className="flex items-center gap-2.5 min-h-[36px] cursor-pointer select-none">
                     <input
                       type="checkbox"
                       checked={soloSettings.visualTasks}
                       onChange={(e) => onUpdateSoloSettings({ visualTasks: e.target.checked })}
-                      className="accent-amber-400 w-3.5 h-3.5"
+                      className="accent-amber-400 w-4 h-4"
                     />
                     <span>লাইভ কাজের দৃশ্য</span>
                   </label>
-                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <label className="flex items-center gap-2.5 min-h-[36px] cursor-pointer select-none">
                     <input
                       type="checkbox"
                       checked={soloSettings.enableSpecialRoles}
                       onChange={(e) => onUpdateSoloSettings({ enableSpecialRoles: e.target.checked })}
-                      className="accent-amber-400 w-3.5 h-3.5"
+                      className="accent-amber-400 w-4 h-4"
                     />
                     <span>স্পেশাল রোল</span>
                   </label>

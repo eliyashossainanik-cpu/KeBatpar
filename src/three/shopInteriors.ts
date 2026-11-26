@@ -161,6 +161,7 @@ export function createAddaMonument(isSoftwareGl: boolean): THREE.Group {
 export function createChaStallProps(
   textures: ProceduralTextureSet,
   isSoftwareGl: boolean,
+  isLiteGraphics = isSoftwareGl,
 ): { group: THREE.Group; ceilingFan: THREE.Group } {
   const group = new THREE.Group();
   const woodMat = new THREE.MeshStandardMaterial({ color: '#78350f', roughness: 0.82 });
@@ -169,7 +170,7 @@ export function createChaStallProps(
     color: '#64748b',
     roughness: 0.34,
     metalness: 0.78,
-    normalMap: textures.tinNormal,
+    normalMap: isLiteGraphics ? undefined : textures.tinNormal,
     normalScale: new THREE.Vector2(0.85, 0.85),
   });
   const kettleMat = new THREE.MeshStandardMaterial({ color: '#e2e8f0', roughness: 0.16, metalness: 0.92 });

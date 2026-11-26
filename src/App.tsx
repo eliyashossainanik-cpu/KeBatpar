@@ -57,6 +57,20 @@ import {
   isTouchOrMobileDevice,
 } from './utils/mobileFullscreen';
 
+function getLobbyUiSignature(snap: RoomSnapshot, localId: string): string {
+  const lp = snap.players.find((p) => p.id === localId);
+  const nearVeh =
+    lp && lp.alive && !lp.inVent && !lp.vehicleId && (lp.y ?? 0) <= 1.2
+      ? findNearestAvailableVehicle(lp.x, lp.z, snap.vehicles)?.id ?? ''
+      : '';
+  const playersKey = snap.players
+    .map((p) => `${p.id}:${p.name}:${p.color}:${p.ready ? 1 : 0}:${p.isHost ? 1 : 0}:${p.isBot ? 1 : 0}`)
+    .join(',');
+  const s = snap.settings;
+  const settingsKey = `${s.vondoCount}|${s.killCooldownSec}|${s.tasksPerPlayer}|${s.meetingTimeSec}|${s.moveSpeed}|${s.emergencyMeetingsPerPlayer}|${s.emergencyCooldownSec}|${s.confirmEjects ? 1 : 0}|${s.anonymousVotes ? 1 : 0}|${s.visualTasks ? 1 : 0}|${s.enableSpecialRoles ? 1 : 0}|${s.enableNeutralRoles ? 1 : 0}|${s.autoFillBots ? 1 : 0}`;
+  return `${snap.phase}|${snap.roomCode}|${snap.lobbyCountdownSec ?? ''}|${snap.lobbyChat?.length ?? 0}|${lp?.vehicleId ?? ''}|${nearVeh}|${settingsKey}|${playersKey}`;
+}
+
 export default function App() {
   const [playerName, setPlayerName] = useState('Lal Mia');
   const [playerColor, setPlayerColor] = useState<PlayerColorId>('lal');
@@ -179,6 +193,21 @@ export default function App() {
     showClueNotice,
   );
 
+  const [lobbySheetExpanded, setLobbySheetExpanded] = useState(false);
+  const soloLiveSnapshotRef = useRef<RoomSnapshot | null>(null);
+  const liveSceneSnapshotRef = useRef<RoomSnapshot | null>(null);
+  const lastLobbySigRef = useRef('');
+  const syncSoloSnapshotNow = useCallback(() => {
+    const engine = soloEngineRef.current;
+    if (!engine) return;
+    const snap = engine.getSnapshot();
+    soloLiveSnapshotRef.current = snap;
+    liveSceneSnapshotRef.current = snap;
+    if (snap.phase === 'lobby') {
+      lastLobbySigRef.current = getLobbyUiSignature(snap, engine.localPlayerId);
+    }
+    setSoloSnapshot(snap);
+  }, []);
   const isMulti = mode === 'multi';
   const activeSnapshot = isMulti ? mp.snapshot : soloSnapshot;
   const activePlayerId = isMulti ? mp.localPlayerId : soloEngineRef.current?.localPlayerId ?? null;
@@ -186,6 +215,7 @@ export default function App() {
   const activePlayerIdRef = useRef(activePlayerId);
   activeSnapshotRef.current = activeSnapshot;
   activePlayerIdRef.current = activePlayerId;
+  liveSceneSnapshotRef.current = isMulti ? mp.snapshot : (soloLiveSnapshotRef.current ?? soloSnapshot);
 
   const derivedPhase: GamePhase = (() => {
     if (mode === 'title' || !activeSnapshot) return 'title';
@@ -277,7 +307,11 @@ export default function App() {
         );
         soloEngineRef.current = engine;
         recordedOutcomeRef.current = false;
-        setSoloSnapshot(engine.getSnapshot());
+        const initSnap = engine.getSnapshot();
+        soloLiveSnapshotRef.current = initSnap;
+        liveSceneSnapshotRef.current = initSnap;
+        lastLobbySigRef.current = getLobbyUiSignature(initSnap, engine.localPlayerId);
+        setSoloSnapshot(initSnap);
         setMode('solo');
         setPaused(false);
         setActiveTaskId(null);
@@ -314,7 +348,7 @@ export default function App() {
     }
   }, [startSoloMatch]);
 
-  // Solo 15Hz snapshot loop with wall-clock clamped dt (3D scene interpolates & renders at native 60fps)
+  // Solo 15Hz simulation step (3D scene reads liveSceneSnapshotRef at 60fps; Lobby React skips pure position ticks)
   useEffect(() => {
     if (mode !== 'solo') return;
     let lastTick = performance.now();
@@ -324,11 +358,23 @@ export default function App() {
       lastTick = now;
       const engine = soloEngineRef.current;
       if (!engine) return;
-      const snap = engine.getSnapshot();
+      const cur = engine.getSnapshot();
       // Never pause meeting/voting/ejection/role_reveal phases so Shalish can never freeze
-      if (paused && snap.phase === 'playing') return;
+      if (paused && cur.phase === 'playing') return;
       engine.step(dt);
-      setSoloSnapshot(engine.getSnapshot());
+      const nextSnap = engine.getSnapshot();
+      soloLiveSnapshotRef.current = nextSnap;
+      liveSceneSnapshotRef.current = nextSnap;
+      if (nextSnap.phase === 'lobby') {
+        const nextSig = getLobbyUiSignature(nextSnap, engine.localPlayerId);
+        if (nextSig !== lastLobbySigRef.current) {
+          lastLobbySigRef.current = nextSig;
+          setSoloSnapshot(nextSnap);
+        }
+      } else {
+        lastLobbySigRef.current = '';
+        setSoloSnapshot(nextSnap);
+      }
     }, 66);
     return () => clearInterval(timer);
   }, [mode, paused]);
@@ -368,12 +414,12 @@ export default function App() {
     (vehicleId?: string) => {
       if (mode === 'solo' && soloEngineRef.current) {
         soloEngineRef.current.toggleLocalVehicle(vehicleId);
-        setSoloSnapshot(soloEngineRef.current.getSnapshot());
+        syncSoloSnapshotNow();
       } else if (mode === 'multi') {
         mp.send({ type: 'player:vehicle_toggle', vehicleId });
       }
     },
-    [mode, mp],
+    [mode, mp, syncSoloSnapshotNow],
   );
 
   const handleVehicleHorn = useCallback(() => {
@@ -628,6 +674,10 @@ export default function App() {
   const handleReturnToTitle = useCallback(() => {
     if (isMulti) mp.disconnectRoom();
     soloEngineRef.current = null;
+    soloLiveSnapshotRef.current = null;
+    liveSceneSnapshotRef.current = null;
+    lastLobbySigRef.current = '';
+    setLobbySheetExpanded(false);
     setSoloSnapshot(null);
     setPaused(false);
     setActiveTaskId(null);
@@ -931,6 +981,7 @@ export default function App() {
       <WorldScene
         phase={derivedPhase}
         snapshot={activeSnapshot}
+        liveSnapshotRef={liveSceneSnapshotRef}
         localPlayerId={activePlayerId}
         moveSpeed={activeSnapshot?.settings.moveSpeed ?? 9.0}
         isModalOpen={
@@ -1005,90 +1056,107 @@ export default function App() {
 
       {/* Waiting Lobby (Unified for Solo Room & Multiplayer) */}
       {derivedPhase === 'lobby' && activeSnapshot && activePlayerId && (
-        <LobbyOverlay
-          snapshot={activeSnapshot}
-          localPlayerId={activePlayerId}
-          errorMsg={isMulti ? mp.errorMsg : null}
-          onUpdateSettings={(s: Partial<RoomSettings>) => {
-            if (isMulti) {
-              mp.send({ type: 'lobby:settings', settings: s });
-            } else if (soloEngineRef.current) {
-              soloEngineRef.current.updateLobbySettings(s);
-              setSoloSnapshot(soloEngineRef.current.getSnapshot());
+        <>
+          <LobbyOverlay
+            snapshot={activeSnapshot}
+            localPlayerId={activePlayerId}
+            errorMsg={isMulti ? mp.errorMsg : null}
+            onMobileSheetExpandedChange={setLobbySheetExpanded}
+            onUpdateSettings={(s: Partial<RoomSettings>) => {
+              if (isMulti) {
+                mp.send({ type: 'lobby:settings', settings: s });
+              } else if (soloEngineRef.current) {
+                soloEngineRef.current.updateLobbySettings(s);
+                syncSoloSnapshotNow();
+              }
+            }}
+            onCustomize={(name, color) => {
+              if (typeof name === 'string') setPlayerName(name);
+              if (color) setPlayerColor(color);
+              if (isMulti) {
+                mp.send({ type: 'lobby:customize', name, color });
+              } else if (soloEngineRef.current) {
+                soloEngineRef.current.customizeLocal(name, color);
+                syncSoloSnapshotNow();
+              }
+            }}
+            onReadyToggle={
+              isMulti ? (ready) => mp.send({ type: 'lobby:ready', ready }) : undefined
             }
-          }}
-          onCustomize={(name, color) => {
-            if (typeof name === 'string') setPlayerName(name);
-            if (color) setPlayerColor(color);
-            if (isMulti) {
-              mp.send({ type: 'lobby:customize', name, color });
-            } else if (soloEngineRef.current) {
-              soloEngineRef.current.customizeLocal(name, color);
-              setSoloSnapshot(soloEngineRef.current.getSnapshot());
+            onKickPlayer={
+              isMulti ? (targetPlayerId) => mp.send({ type: 'lobby:kick', targetPlayerId }) : undefined
             }
-          }}
-          onReadyToggle={
-            isMulti ? (ready) => mp.send({ type: 'lobby:ready', ready }) : undefined
-          }
-          onKickPlayer={
-            isMulti ? (targetPlayerId) => mp.send({ type: 'lobby:kick', targetPlayerId }) : undefined
-          }
-          onAddBot={() => {
-            if (isMulti) {
-              mp.send({ type: 'lobby:add_bot' });
-            } else if (soloEngineRef.current) {
-              soloEngineRef.current.addBot();
-              setSoloSnapshot(soloEngineRef.current.getSnapshot());
+            onAddBot={() => {
+              if (isMulti) {
+                mp.send({ type: 'lobby:add_bot' });
+              } else if (soloEngineRef.current) {
+                soloEngineRef.current.addBot();
+                syncSoloSnapshotNow();
+              }
+            }}
+            onRemoveBot={(targetPlayerId) => {
+              if (isMulti) {
+                mp.send({ type: 'lobby:remove_bot', targetPlayerId });
+              } else if (soloEngineRef.current) {
+                soloEngineRef.current.removeBot(targetPlayerId);
+                syncSoloSnapshotNow();
+              }
+            }}
+            onRemoveBots={() => {
+              if (isMulti) {
+                mp.send({ type: 'lobby:remove_bots' });
+              } else if (soloEngineRef.current) {
+                soloEngineRef.current.removeBots();
+                syncSoloSnapshotNow();
+              }
+            }}
+            onSendLobbyChat={(text) => {
+              if (isMulti) {
+                mp.send({ type: 'lobby:chat', text });
+              } else if (soloEngineRef.current) {
+                soloEngineRef.current.sendLobbyChat(text);
+                syncSoloSnapshotNow();
+              }
+            }}
+            onStartMatch={() => {
+              if (isMulti) {
+                mp.send({ type: 'lobby:start' });
+              } else if (soloEngineRef.current) {
+                soloEngineRef.current.startCountdown();
+                syncSoloSnapshotNow();
+              }
+            }}
+            onCancelStart={() => {
+              if (isMulti) {
+                mp.send({ type: 'lobby:cancel_start' });
+              } else if (soloEngineRef.current) {
+                soloEngineRef.current.cancelCountdown();
+                syncSoloSnapshotNow();
+              }
+            }}
+            onOpenGuide={() => setShowGuide(true)}
+            onLeaveRoom={handleReturnToTitle}
+            drivingVehicle={drivingVehicle}
+            nearbyVehicle={nearbyVehicle}
+            driveSpeedMs={driveSpeedMs}
+            onToggleVehicle={handleToggleVehicle}
+            onVehicleHorn={handleVehicleHorn}
+          />
+          <MobileControls
+            visible={
+              touchControlsEnabled &&
+              !lobbySheetExpanded &&
+              !showMemePack &&
+              !showGuide
             }
-          }}
-          onRemoveBot={(targetPlayerId) => {
-            if (isMulti) {
-              mp.send({ type: 'lobby:remove_bot', targetPlayerId });
-            } else if (soloEngineRef.current) {
-              soloEngineRef.current.removeBot(targetPlayerId);
-              setSoloSnapshot(soloEngineRef.current.getSnapshot());
-            }
-          }}
-          onRemoveBots={() => {
-            if (isMulti) {
-              mp.send({ type: 'lobby:remove_bots' });
-            } else if (soloEngineRef.current) {
-              soloEngineRef.current.removeBots();
-              setSoloSnapshot(soloEngineRef.current.getSnapshot());
-            }
-          }}
-          onSendLobbyChat={(text) => {
-            if (isMulti) {
-              mp.send({ type: 'lobby:chat', text });
-            } else if (soloEngineRef.current) {
-              soloEngineRef.current.sendLobbyChat(text);
-              setSoloSnapshot(soloEngineRef.current.getSnapshot());
-            }
-          }}
-          onStartMatch={() => {
-            if (isMulti) {
-              mp.send({ type: 'lobby:start' });
-            } else if (soloEngineRef.current) {
-              soloEngineRef.current.startCountdown();
-              setSoloSnapshot(soloEngineRef.current.getSnapshot());
-            }
-          }}
-          onCancelStart={() => {
-            if (isMulti) {
-              mp.send({ type: 'lobby:cancel_start' });
-            } else if (soloEngineRef.current) {
-              soloEngineRef.current.cancelCountdown();
-              setSoloSnapshot(soloEngineRef.current.getSnapshot());
-            }
-          }}
-          onOpenGuide={() => setShowGuide(true)}
-          onLeaveRoom={handleReturnToTitle}
-          drivingVehicle={drivingVehicle}
-          nearbyVehicle={nearbyVehicle}
-          driveSpeedMs={driveSpeedMs}
-          onToggleVehicle={handleToggleVehicle}
-          onVehicleHorn={handleVehicleHorn}
-        />
+            joystickInputRef={joystickInputRef}
+            onJump={handleJump}
+            isDriving={Boolean(drivingVehicle)}
+            onHorn={handleVehicleHorn}
+            onHandbrakeChange={handleHandbrakeChange}
+            onBoostChange={handleBoostChange}
+          />
+        </>
       )}
 
       {/* Role Reveal Intro Banner */}

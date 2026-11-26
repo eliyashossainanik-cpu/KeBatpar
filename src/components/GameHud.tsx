@@ -1687,6 +1687,10 @@ export const GameHud = memo(function GameHud({
               aria-label="সেটিংস ও দ্রুত নিয়ন্ত্রণ"
               className="pointer-events-auto rounded-xl p-2 border border-white/15 bg-slate-950/94 shadow-2xl w-[224px] space-y-1 text-xs"
             >
+              <div className="px-2.5 py-1.5 mb-1 border-b border-white/10 flex items-center justify-between text-[11px]">
+                <span className="font-display font-bold text-amber-300">KE BATPAR 2.0</span>
+                <span className="font-mono-tabular text-slate-400">v2.0</span>
+              </div>
               <button
                 type="button"
                 tabIndex={-1}

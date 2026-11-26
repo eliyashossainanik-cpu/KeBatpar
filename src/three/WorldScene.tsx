@@ -104,6 +104,7 @@ import { isTouchOrMobileDevice } from '../utils/mobileFullscreen';
 export interface WorldSceneProps {
   phase: GamePhase;
   snapshot: RoomSnapshot | null;
+  liveSnapshotRef?: React.MutableRefObject<RoomSnapshot | null>;
   localPlayerId: string | null;
   moveSpeed: number;
   isModalOpen: boolean;
@@ -194,6 +195,7 @@ function getColorSpec(colorId: PlayerColorId) {
 export function WorldScene({
   phase,
   snapshot,
+  liveSnapshotRef,
   localPlayerId,
   moveSpeed,
   isModalOpen,
@@ -214,6 +216,7 @@ export function WorldScene({
 
   const phaseRef = useRef(phase);
   const snapshotRef = useRef(snapshot);
+  const liveSnapshotSourceRef = useRef(liveSnapshotRef);
   const localPlayerIdRef = useRef(localPlayerId);
   const moveSpeedRef = useRef(moveSpeed);
   const isModalOpenRef = useRef(isModalOpen);
@@ -226,6 +229,7 @@ export function WorldScene({
 
   phaseRef.current = phase;
   snapshotRef.current = snapshot;
+  liveSnapshotSourceRef.current = liveSnapshotRef;
   localPlayerIdRef.current = localPlayerId;
   moveSpeedRef.current = moveSpeed;
   isModalOpenRef.current = isModalOpen;
@@ -255,7 +259,7 @@ export function WorldScene({
     let currentDpr = isSoftwareGl
       ? 1
       : isMobileGpu
-        ? Math.min(window.devicePixelRatio || 1, 1.75)
+        ? Math.min(window.devicePixelRatio || 1, 1.4)
         : Math.min(window.devicePixelRatio || 1, 1.5);
 
     const width = container.clientWidth || window.innerWidth;
@@ -267,7 +271,7 @@ export function WorldScene({
     });
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = isMobileGpu ? 1.06 : 1.02;
+    renderer.toneMappingExposure = isMobileGpu ? 1.08 : 1.02;
     renderer.setPixelRatio(currentDpr);
     renderer.setSize(width, height);
     renderer.shadowMap.enabled = !isSoftwareGl;
@@ -291,45 +295,48 @@ export function WorldScene({
     const twilightSkyColor = new THREE.Color(0xb8c8d8);
     const nightSkyColor = new THREE.Color(0x050811);
     const skyColor = twilightSkyColor.clone();
-    const normalFogDensity = 0.0013;
+    const normalFogDensity = isMobileGpu ? 0.0016 : 0.0013;
     scene.background = skyColor;
     scene.fog = new THREE.FogExp2(twilightSkyColor.getHex(), normalFogDensity);
 
-    const pmremGenerator = new THREE.PMREMGenerator(renderer);
-    scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
-    const baseEnvIntensity = 0.72;
-    scene.environmentIntensity = baseEnvIntensity;
-    pmremGenerator.dispose();
+    let baseEnvIntensity = 0;
+    if (!isMobileGpu) {
+      const pmremGenerator = new THREE.PMREMGenerator(renderer);
+      scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+      baseEnvIntensity = 0.72;
+      scene.environmentIntensity = baseEnvIntensity;
+      pmremGenerator.dispose();
+    }
 
     const camera = new THREE.PerspectiveCamera(
       isMobileGpu ? 49 : 54,
       width / height,
       0.2,
-      isMobileGpu ? 520 : 640,
+      isMobileGpu ? 340 : 640,
     );
     camera.position.set(0, 18, 34);
 
     // Golden-Hour / Late-Afternoon Sunlit Outdoor PBR Lighting Rig + Player-Tracking Shadow Frustum
-    const baseHemiIntensity = isMobileGpu ? 0.88 : 0.76;
-    const baseKeyIntensity = 2.45;
-    const baseBounceIntensity = isMobileGpu ? 0.42 : 0.36;
+    const baseHemiIntensity = isMobileGpu ? 1.15 : 0.76;
+    const baseKeyIntensity = isMobileGpu ? 2.38 : 2.45;
+    const baseBounceIntensity = isMobileGpu ? 0.56 : 0.36;
     const hemiLight = new THREE.HemisphereLight(0xd4e8ff, 0x6b5848, baseHemiIntensity);
     scene.add(hemiLight);
 
     const keyLight = new THREE.DirectionalLight(0xfff1d6, baseKeyIntensity);
     keyLight.position.set(32, 46, 26);
     keyLight.castShadow = !isSoftwareGl;
-    const shadowRes = isSoftwareGl ? 1024 : isMobileGpu ? 1024 : 2048;
-    const titleShadowSpan = 48;
-    const playShadowSpan = isMobileGpu ? 14 : 26;
+    const shadowRes = isSoftwareGl ? 1024 : isMobileGpu ? 768 : 2048;
+    const titleShadowSpan = isMobileGpu ? 22 : 48;
+    const playShadowSpan = isMobileGpu ? 13 : 26;
     keyLight.shadow.mapSize.set(shadowRes, shadowRes);
     keyLight.shadow.camera.near = 2;
-    keyLight.shadow.camera.far = 155;
+    keyLight.shadow.camera.far = isMobileGpu ? 120 : 155;
     keyLight.shadow.camera.left = -titleShadowSpan;
     keyLight.shadow.camera.right = titleShadowSpan;
     keyLight.shadow.camera.top = titleShadowSpan;
     keyLight.shadow.camera.bottom = -titleShadowSpan;
-    keyLight.shadow.radius = isMobileGpu ? 1.8 : 2.2;
+    keyLight.shadow.radius = isMobileGpu ? 1.4 : 2.2;
     keyLight.shadow.bias = -0.00035;
     keyLight.shadow.normalBias = 0.02;
     scene.add(keyLight);
@@ -380,10 +387,10 @@ export function WorldScene({
       new THREE.PlaneGeometry(MAP_HALF_SIZE * 2, MAP_HALF_SIZE * 2),
       new THREE.MeshStandardMaterial({
         map: textures.asphaltMap,
-        normalMap: textures.asphaltNormal,
+        normalMap: isLiteGraphics ? undefined : textures.asphaltNormal,
         normalScale: new THREE.Vector2(1.0, 1.0),
-        roughnessMap: isMobileGpu ? undefined : textures.asphaltRoughness,
-        roughness: isMobileGpu ? 0.88 : 1.0,
+        roughnessMap: isLiteGraphics ? undefined : textures.asphaltRoughness,
+        roughness: isLiteGraphics ? 0.88 : 1.0,
         metalness: 0.02,
       }),
     );
@@ -417,19 +424,19 @@ export function WorldScene({
     const roadSurfaceMatNS = new THREE.MeshStandardMaterial({
       color: '#ffffff',
       map: roadMapNS,
-      normalMap: roadNormNS,
+      normalMap: isLiteGraphics ? undefined : roadNormNS,
       normalScale: new THREE.Vector2(0.95, 0.95),
-      roughnessMap: isMobileGpu ? undefined : roadRoughNS,
-      roughness: isMobileGpu ? 0.88 : 1.0,
+      roughnessMap: isLiteGraphics ? undefined : roadRoughNS,
+      roughness: isLiteGraphics ? 0.88 : 1.0,
       metalness: 0.02,
     });
     const roadSurfaceMatEW = new THREE.MeshStandardMaterial({
       color: '#ffffff',
       map: roadMapEW,
-      normalMap: roadNormEW,
+      normalMap: isLiteGraphics ? undefined : roadNormEW,
       normalScale: new THREE.Vector2(0.95, 0.95),
-      roughnessMap: isMobileGpu ? undefined : roadRoughEW,
-      roughness: isMobileGpu ? 0.88 : 1.0,
+      roughnessMap: isLiteGraphics ? undefined : roadRoughEW,
+      roughness: isLiteGraphics ? 0.88 : 1.0,
       metalness: 0.02,
     });
     const roadsGroup = new THREE.Group();
@@ -628,7 +635,7 @@ export function WorldScene({
       new THREE.MeshStandardMaterial({
         color: '#ffffff',
         map: textures.cobbleMap,
-        normalMap: textures.cobbleNormal,
+        normalMap: isLiteGraphics ? undefined : textures.cobbleNormal,
         normalScale: new THREE.Vector2(0.9, 0.9),
         roughness: 0.78,
         metalness: 0.07,
@@ -638,7 +645,7 @@ export function WorldScene({
       new THREE.MeshStandardMaterial({
         color: '#d9c2ae',
         map: textures.terracottaTileMap,
-        normalMap: textures.tileNormal,
+        normalMap: isLiteGraphics ? undefined : textures.tileNormal,
         normalScale: new THREE.Vector2(0.65, 0.65),
         roughness: 0.84,
         metalness: 0.04,
@@ -699,7 +706,7 @@ export function WorldScene({
                       new THREE.MeshStandardMaterial({
                         color: terraTint,
                         map: textures.terracottaTileMap,
-                        normalMap: textures.tileNormal,
+                        normalMap: isLiteGraphics ? undefined : textures.tileNormal,
                         normalScale: new THREE.Vector2(0.65, 0.65),
                         roughness: 0.82,
                         metalness: 0.04,
@@ -803,9 +810,9 @@ export function WorldScene({
     const sidewalkSlabMat = new THREE.MeshStandardMaterial({
       color: '#94a3b8',
       map: textures.sidewalkMap,
-      normalMap: textures.stuccoNormal,
+      normalMap: isLiteGraphics ? undefined : textures.stuccoNormal,
       normalScale: new THREE.Vector2(0.8, 0.8),
-      roughnessMap: isMobileGpu ? undefined : textures.concreteRoughness,
+      roughnessMap: isLiteGraphics ? undefined : textures.concreteRoughness,
       roughness: 0.9,
       metalness: 0.02,
     });
@@ -910,21 +917,32 @@ export function WorldScene({
       emissive: '#0c4a6e',
       emissiveIntensity: 0.16,
     });
-    waterMat.onBeforeCompile = (shader) => {
-      shader.uniforms.uTime = waterUniforms.uTime;
-      shader.vertexShader = `uniform float uTime;\nvarying vec2 vWaterUv;\n${shader.vertexShader}`.replace(
-        '#include <begin_vertex>',
-        `#include <begin_vertex>
-         vWaterUv = uv;
-         transformed.z += sin(position.x * 1.4 + uTime * 2.2) * 0.045 + cos(position.y * 1.2 + uTime * 1.7) * 0.04;`,
-      );
-      shader.fragmentShader = `uniform float uTime;\nvarying vec2 vWaterUv;\n${shader.fragmentShader}`.replace(
-        '#include <dithering_fragment>',
-        `float wGlint = pow(max(0.0, sin(vWaterUv.x * 26.0 + uTime * 2.1) * cos(vWaterUv.y * 22.0 - uTime * 1.65)), 6.0);
-         gl_FragColor.rgb += vec3(0.14, 0.28, 0.36) * wGlint;
-         #include <dithering_fragment>`,
-      );
-    };
+    if (!isLiteGraphics) {
+      waterMat.onBeforeCompile = (shader) => {
+        shader.uniforms.uTime = waterUniforms.uTime;
+        shader.vertexShader = `uniform float uTime;\nvarying vec2 vWaterUv;\n${shader.vertexShader}`.replace(
+          '#include <begin_vertex>',
+          `#include <begin_vertex>
+           vWaterUv = uv;
+           transformed.z += sin(position.x * 1.4 + uTime * 2.2) * 0.045 + cos(position.y * 1.2 + uTime * 1.7) * 0.04;`,
+        );
+        shader.fragmentShader = `uniform float uTime;\nvarying vec2 vWaterUv;\n${shader.fragmentShader}`.replace(
+          '#include <dithering_fragment>',
+          `float wGlint = pow(max(0.0, sin(vWaterUv.x * 26.0 + uTime * 2.1) * cos(vWaterUv.y * 22.0 - uTime * 1.65)), 6.0);
+           gl_FragColor.rgb += vec3(0.14, 0.28, 0.36) * wGlint;
+           #include <dithering_fragment>`,
+        );
+      };
+    } else {
+      waterMat.onBeforeCompile = (shader) => {
+        shader.uniforms.uTime = waterUniforms.uTime;
+        shader.vertexShader = `uniform float uTime;\n${shader.vertexShader}`.replace(
+          '#include <begin_vertex>',
+          `#include <begin_vertex>
+           transformed.z += sin(position.x * 1.4 + uTime * 2.2) * 0.04 + cos(position.y * 1.2 + uTime * 1.7) * 0.035;`,
+        );
+      };
+    }
     const waterSegX = isMobileGpu ? 10 : 22;
     const waterSegZ = isMobileGpu ? 16 : 32;
     const pukurWater = new THREE.Mesh(new THREE.PlaneGeometry(9.2, 16.0, waterSegX, waterSegZ), waterMat);
@@ -975,16 +993,17 @@ export function WorldScene({
 
     // Distinct Architectural Wall Materials & Coping Caps per Moholla District
     const occluderWalls: OccluderAabb[] = [];
+    const wallNorm = (tex: THREE.Texture) => (isLiteGraphics ? undefined : tex);
     const brickWallMat = new THREE.MeshStandardMaterial({
       map: textures.wallBrickMap,
-      normalMap: textures.wallBrickNormal,
+      normalMap: wallNorm(textures.wallBrickNormal),
       normalScale: new THREE.Vector2(1.0, 1.0),
       roughness: 0.9,
       metalness: 0.0,
     });
     const alleyWallMat = new THREE.MeshStandardMaterial({
       map: textures.alleyStuccoMap,
-      normalMap: textures.stuccoNormal,
+      normalMap: wallNorm(textures.stuccoNormal),
       normalScale: new THREE.Vector2(0.85, 0.85),
       roughness: 0.88,
       metalness: 0.02,
@@ -992,147 +1011,147 @@ export function WorldScene({
     const zoneWallMatMap: Record<string, THREE.MeshStandardMaterial> = {
       cha_dokan: new THREE.MeshStandardMaterial({
         map: textures.chaWallMap,
-        normalMap: textures.stuccoNormal,
+        normalMap: wallNorm(textures.stuccoNormal),
         normalScale: new THREE.Vector2(0.75, 0.75),
         roughness: 0.86,
         metalness: 0.02,
       }),
       rickshaw_garage: new THREE.MeshStandardMaterial({
         map: textures.garageWallMap,
-        normalMap: textures.blockNormal,
+        normalMap: wallNorm(textures.blockNormal),
         normalScale: new THREE.Vector2(0.85, 0.85),
         roughness: 0.84,
         metalness: 0.04,
       }),
       desco_power: new THREE.MeshStandardMaterial({
         map: textures.descoWallMap,
-        normalMap: textures.tinNormal,
+        normalMap: wallNorm(textures.tinNormal),
         normalScale: new THREE.Vector2(0.9, 0.9),
         roughness: 0.44,
         metalness: 0.48,
       }),
       dish_roof: new THREE.MeshStandardMaterial({
         map: textures.dishWallMap,
-        normalMap: textures.blockNormal,
+        normalMap: wallNorm(textures.blockNormal),
         normalScale: new THREE.Vector2(0.8, 0.8),
         roughness: 0.74,
         metalness: 0.12,
       }),
       saloon_goli: new THREE.MeshStandardMaterial({
         map: textures.saloonWallMap,
-        normalMap: textures.tileNormal,
+        normalMap: wallNorm(textures.tileNormal),
         normalScale: new THREE.Vector2(0.7, 0.7),
         roughness: 0.34,
         metalness: 0.08,
       }),
       pharmacy_mor: new THREE.MeshStandardMaterial({
         map: textures.pharmacyWallMap,
-        normalMap: textures.tileNormal,
+        normalMap: wallNorm(textures.tileNormal),
         normalScale: new THREE.Vector2(0.7, 0.7),
         roughness: 0.3,
         metalness: 0.06,
       }),
       kakar_bari: new THREE.MeshStandardMaterial({
         map: textures.kakaWallMap,
-        normalMap: textures.stuccoNormal,
+        normalMap: wallNorm(textures.stuccoNormal),
         normalScale: new THREE.Vector2(0.8, 0.8),
         roughness: 0.82,
         metalness: 0.02,
       }),
       master_bari: new THREE.MeshStandardMaterial({
         map: textures.masterWallMap,
-        normalMap: textures.stuccoNormal,
+        normalMap: wallNorm(textures.stuccoNormal),
         normalScale: new THREE.Vector2(0.8, 0.8),
         roughness: 0.82,
         metalness: 0.02,
       }),
       chacha_bari: new THREE.MeshStandardMaterial({
         map: textures.chachaWallMap,
-        normalMap: textures.stuccoNormal,
+        normalMap: wallNorm(textures.stuccoNormal),
         normalScale: new THREE.Vector2(0.8, 0.8),
         roughness: 0.82,
         metalness: 0.02,
       }),
       khalar_bari: new THREE.MeshStandardMaterial({
         map: textures.khalaWallMap,
-        normalMap: textures.stuccoNormal,
+        normalMap: wallNorm(textures.stuccoNormal),
         normalScale: new THREE.Vector2(0.8, 0.8),
         roughness: 0.82,
         metalness: 0.02,
       }),
       nanar_bari: new THREE.MeshStandardMaterial({
         map: textures.nanaWallMap,
-        normalMap: textures.stuccoNormal,
+        normalMap: wallNorm(textures.stuccoNormal),
         normalScale: new THREE.Vector2(0.8, 0.8),
         roughness: 0.84,
         metalness: 0.02,
       }),
       cinema_hall: new THREE.MeshStandardMaterial({
         map: textures.cinemaWallMap,
-        normalMap: textures.tileNormal,
+        normalMap: wallNorm(textures.tileNormal),
         normalScale: new THREE.Vector2(0.75, 0.75),
         roughness: 0.48,
         metalness: 0.1,
       }),
       bhai_duplex: new THREE.MeshStandardMaterial({
         map: textures.bhaiWallMap,
-        normalMap: textures.stuccoNormal,
+        normalMap: wallNorm(textures.stuccoNormal),
         normalScale: new THREE.Vector2(0.75, 0.75),
         roughness: 0.72,
         metalness: 0.05,
       }),
       coaching_center: new THREE.MeshStandardMaterial({
         map: textures.coachingWallMap,
-        normalMap: textures.stuccoNormal,
+        normalMap: wallNorm(textures.stuccoNormal),
         normalScale: new THREE.Vector2(0.8, 0.8),
         roughness: 0.8,
         metalness: 0.02,
       }),
       khalur_bari: new THREE.MeshStandardMaterial({
         map: textures.khaluWallMap,
-        normalMap: textures.stuccoNormal,
+        normalMap: wallNorm(textures.stuccoNormal),
         normalScale: new THREE.Vector2(0.8, 0.8),
         roughness: 0.82,
         metalness: 0.02,
       }),
       kacchi_house: new THREE.MeshStandardMaterial({
         map: textures.kacchiWallMap,
-        normalMap: textures.stuccoNormal,
+        normalMap: wallNorm(textures.stuccoNormal),
         normalScale: new THREE.Vector2(0.8, 0.8),
         roughness: 0.82,
         metalness: 0.04,
       }),
       cyber_cafe: new THREE.MeshStandardMaterial({
         map: textures.cyberWallMap,
-        normalMap: textures.tileNormal,
+        normalMap: wallNorm(textures.tileNormal),
         normalScale: new THREE.Vector2(0.75, 0.75),
         roughness: 0.42,
         metalness: 0.18,
       }),
       dorji_bari: new THREE.MeshStandardMaterial({
         map: textures.dorjiWallMap,
-        normalMap: textures.stuccoNormal,
+        normalMap: wallNorm(textures.stuccoNormal),
         normalScale: new THREE.Vector2(0.8, 0.8),
         roughness: 0.78,
         metalness: 0.04,
       }),
       tiger_gym: new THREE.MeshStandardMaterial({
         map: textures.gymWallMap,
-        normalMap: textures.blockNormal,
+        normalMap: wallNorm(textures.blockNormal),
         normalScale: new THREE.Vector2(0.85, 0.85),
         roughness: 0.56,
         metalness: 0.22,
       }),
       rail_colony: new THREE.MeshStandardMaterial({
         map: textures.colonyWallMap,
-        normalMap: textures.blockNormal,
+        normalMap: wallNorm(textures.blockNormal),
         normalScale: new THREE.Vector2(0.85, 0.85),
         roughness: 0.84,
         metalness: 0.04,
       }),
       fufu_bari: new THREE.MeshStandardMaterial({
         map: textures.fufuWallMap,
-        normalMap: textures.stuccoNormal,
+        normalMap: wallNorm(textures.stuccoNormal),
         normalScale: new THREE.Vector2(0.8, 0.8),
         roughness: 0.8,
         metalness: 0.02,
@@ -1652,7 +1671,7 @@ export function WorldScene({
           color: b.eaveHex,
           roughness: 0.32,
           metalness: 0.68,
-          normalMap: textures.tinNormal,
+          normalMap: isLiteGraphics ? undefined : textures.tinNormal,
           normalScale: new THREE.Vector2(0.85, 0.85),
         });
         eaveMatByHex.set(b.eaveHex, eaveMat);
@@ -1770,9 +1789,9 @@ export function WorldScene({
     const archGroup = new THREE.Group();
     const plinthMat = new THREE.MeshStandardMaterial({
       color: '#475569',
-      normalMap: textures.stuccoNormal,
+      normalMap: isLiteGraphics ? undefined : textures.stuccoNormal,
       normalScale: new THREE.Vector2(0.7, 0.7),
-      roughnessMap: isMobileGpu ? undefined : textures.concreteRoughness,
+      roughnessMap: isLiteGraphics ? undefined : textures.concreteRoughness,
       roughness: 0.92,
       metalness: 0.04,
     });
@@ -1803,18 +1822,18 @@ export function WorldScene({
 
     const concreteDeckMat = new THREE.MeshStandardMaterial({
       map: textures.cobbleMap,
-      normalMap: textures.stuccoNormal,
+      normalMap: isLiteGraphics ? undefined : textures.stuccoNormal,
       normalScale: new THREE.Vector2(0.7, 0.7),
-      roughnessMap: isMobileGpu ? undefined : textures.concreteRoughness,
+      roughnessMap: isLiteGraphics ? undefined : textures.concreteRoughness,
       color: '#cbd5e1',
       roughness: 0.9,
       metalness: 0.02,
     });
     const stairTreadMat = new THREE.MeshStandardMaterial({
       color: '#94a3b8',
-      normalMap: textures.stuccoNormal,
+      normalMap: isLiteGraphics ? undefined : textures.stuccoNormal,
       normalScale: new THREE.Vector2(0.65, 0.65),
-      roughnessMap: isMobileGpu ? undefined : textures.concreteRoughness,
+      roughnessMap: isLiteGraphics ? undefined : textures.concreteRoughness,
       roughness: 0.9,
       metalness: 0.02,
     });
@@ -2866,7 +2885,7 @@ export function WorldScene({
 
     // Composite Hero Landmarks, Detailed Shop Interiors & Vehicles
     scene.add(createAddaMonument(isSoftwareGl));
-    const chaStall = createChaStallProps(textures, isSoftwareGl);
+    const chaStall = createChaStallProps(textures, isSoftwareGl, isLiteGraphics);
     scene.add(chaStall.group);
     scene.add(createRickshawGarageProps(textures, isSoftwareGl));
     scene.add(createEidgahGate(isSoftwareGl));
@@ -3945,15 +3964,15 @@ export function WorldScene({
                 renderer.setSize(rw, rh);
               }
             }
-          } else if (avgDt > 0.022) {
-            if (currentDpr > 1.52) {
-              currentDpr = 1.48;
+          } else if (avgDt > 0.02) {
+            if (currentDpr > 1.2) {
+              currentDpr = 1.15;
               renderer.setPixelRatio(currentDpr);
               const rw = container.clientWidth || window.innerWidth;
               const rh = container.clientHeight || window.innerHeight;
               renderer.setSize(rw, rh);
-            } else if (currentDpr > 1.38) {
-              currentDpr = 1.35;
+            } else if (currentDpr > 1.0) {
+              currentDpr = 1.0;
               renderer.setPixelRatio(currentDpr);
               const rw = container.clientWidth || window.innerWidth;
               const rh = container.clientHeight || window.innerHeight;
@@ -4043,7 +4062,7 @@ export function WorldScene({
         }
         lastObservedPhase = curPhase;
       }
-      const snap = snapshotRef.current;
+      const snap = liveSnapshotSourceRef.current?.current ?? snapshotRef.current;
 
       const showTitleActors = curPhase === 'title';
       for (const actor of titleShowActors) {
